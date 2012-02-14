@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="windows-1252"?>
 <env name="local">
 	<Cell name="cell01">
+		<Security>
+        	<JAASAuthData alias="local_oracle_alias" userId="swaymouth" password="secret"/>
+        </Security>
     	<dmgr host="altus3400.dovetail.net" port="8880"/>
     	<Node name="node01">
     		<Server name="srv01">
@@ -22,5 +25,10 @@
             	<ConnectionPool maxConnections="1000" minConnections="5" testConnection="true" testConnectionInterval="3"/>
 			</DataSource>
 		</JDBCProvider>
+        <MQQueueConnectionFactory name="QCF1" jndiName="jms/QCF1" queueManager="QMGR1" host="localhost" port="1415" channel="CH1" transportType="BINDINGS_THEN_CLIENT">
+            <J2EEResourcePropertySet>
+            	<connectionPool maxConnections="200"/>
+        	</J2EEResourcePropertySet>
+		</MQQueueConnectionFactory>
 	</Cell>
 </env>

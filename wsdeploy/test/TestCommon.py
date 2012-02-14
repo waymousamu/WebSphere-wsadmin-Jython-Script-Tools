@@ -27,6 +27,7 @@ CMDLIST_ND = [["Cell", {"name": "CCITstLP0ECell001"}],
 CONFDICT_BASE = [
                  {'env': {'name': 'local'}},
                  {'Cell': {'name': 'HP8200SWaymouthNode01Cell'}},
+                 {'JAASAuthData': {'alias': 'local_oracle_alias', 'userId': 'swaymouth', 'password': 'secret', 'scope': '/Cell:HP8200SWaymouthNode01Cell/'}},
                  {'dmgr': {'port': '8880', 'host': 'localhost'}},
                  {'Node': {'scope': '/Cell:HP8200SWaymouthNode01Cell/', 'name': 'HP8200SWaymouthNode01'}},
                  {'Server': {'scope': '/Node:HP8200SWaymouthNode01/', 'name': 'server1'}},
@@ -39,12 +40,17 @@ CONFDICT_BASE = [
                  {'J2EEResourceProperty': {'name': 'validateNewConnection', 'scope': '/DataSource:Q5DataSource/', 'type': 'java.lang.Boolean', 'value': 'true'}},
                  {'J2EEResourceProperty': {'name': 'validateNewConnectionRetryCount', 'scope': '/DataSource:Q5DataSource/', 'type': 'java.lang.Integer', 'value': '5'}},
                  {'J2EEResourceProperty': {'name': 'validateNewConnectionRetryInterval', 'scope': '/DataSource:Q5DataSource/', 'type': 'java.lang.Long', 'value': '5'}},
-                 {'ConnectionPool': {'maxConnections': '1000', 'scope': '/DataSource:Q5DataSource/', 'testConnectionInterval': '3', 'minConnections': '5', 'testConnection': 'true'}}
+                 {'ConnectionPool': {'maxConnections': '1000', 'scope': '/DataSource:Q5DataSource/', 'testConnectionInterval': '3', 'minConnections': '5', 'testConnection': 'true'}},
+                 {'MQQueueConnectionFactory': {'transportType': 'BINDINGS_THEN_CLIENT', 'port': '1415', 'name': 'QCF1', 'scope': '/Cell:HP8200SWaymouthNode01Cell/', 'host': 'localhost', 'channel': 'CH1', 'queueManager': 'QMGR1', 'jndiName': 'jms/QCF1'}},
+                 {'connectionPool': {'maxConnections': '200', 'scope': '/MQQueueConnectionFactory:QCF1/'}}
                  ]
 
 CONFXML_BASE = """
             <env name="local">
                 <Cell name="HP8200SWaymouthNode01Cell">
+                    <Security>
+                        <JAASAuthData alias="local_oracle_alias" userId="swaymouth" password="secret"/>
+                    </Security>
                     <dmgr host="localhost" port="8880"/>
                     <Node name="HP8200SWaymouthNode01">
                         <Server name="server1">
@@ -66,6 +72,11 @@ CONFXML_BASE = """
                             <ConnectionPool maxConnections="1000" minConnections="5" testConnection="true" testConnectionInterval="3"/>
                         </DataSource>
                     </JDBCProvider>
+                    <MQQueueConnectionFactory name="QCF1" jndiName="jms/QCF1" queueManager="QMGR1" host="localhost" port="1415" channel="CH1" transportType="BINDINGS_THEN_CLIENT">
+                        <J2EEResourcePropertySet>
+                            <connectionPool maxConnections="200"/>
+                        </J2EEResourcePropertySet>
+                    </MQQueueConnectionFactory>
                 </Cell>
             </env>
             """

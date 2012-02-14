@@ -64,13 +64,17 @@ class ProcessCommands:
                 elif k == "JDBCProvider":
                     self.logger.debug("generateCommands: block = JDBCProvider")
                     self.processConfigItem(k=k, v=v)
-                elif k == "DataSource":
-                    self.logger.debug("generateCommands: block = DataSource")
+                elif k == "DataSource" or k == "MQQueueConnectionFactory":
+                    self.logger.debug("generateCommands: block = DataSource or MQQueueConnectionFactory")
                     t=None
-                    if v['providerType'] == 'Oracle JDBC Driver (XA)':
-                        t = AdminConfig.listTemplates('DataSource', "Oracle JDBC Driver XA DataSource")
-                    else:
-                        t = AdminConfig.listTemplates('DataSource', "Oracle JDBC Driver DataSource")
+                    if k == 'DataSource':
+                        if v['providerType'] == 'Oracle JDBC Driver (XA)':
+                            t = AdminConfig.listTemplates('DataSource', "Oracle JDBC Driver XA DataSource")
+                        else:
+                            t = AdminConfig.listTemplates('DataSource', "Oracle JDBC Driver DataSource")
+                    elif k == 'MQQueueConnectionFactory':
+                        t = AdminConfig.listTemplates('MQQueueConnectionFactory', 'First Example WMQ QueueConnectionFactory')
+                        v['scope'] = ('%sJMSProvider:WebSphere MQ JMS Provider/' % v['scope'])
                     self.processConfigItem(k=k, v=v, t=t)
                 elif k == "J2EEResourceProperty":
                     self.logger.debug("generateCommands: block = J2EEResourceProperty")
@@ -78,13 +82,13 @@ class ProcessCommands:
                 elif k == "JAASAuthData":
                     self.logger.debug("generateCommands: block = JAASAuthData")
                     self.processSecrurity(k=k, v=v)
-                elif k == "ConnectionPool":
+                elif k == "ConnectionPool" or k == "connectionPool":
                     self.logger.debug("generateCommands: block = ConnectionPool")
                     self.processNestedAttribute(k=k, v=v)
                 elif k == "JavaVirtualMachine" or k == "ProcessExecution":
                     self.logger.debug("generateCommands: block = JavaVirtualMachine or ProcessExecution")
                     self.processNestedAttribute(k=k, v=v)
-                elif k == "env" or k == "Node" or k == 'dmgr':
+                elif k == "env" or k == "Node" or k == 'dmgr' or k == 'JMSProvider':
                     self.logger.debug("generateCommands: block = env or Node or dmgr")
                     '''Ignore a tag'''
                     self.logger.info("generateCommands: ignoring tag %s" % k )
@@ -92,16 +96,6 @@ class ProcessCommands:
                     '''Throw an exception if the tag is unknown'''
                     self.logger.error("generateCommands: %s is an unknown key, it will be ignored." % k)
                     raise ProcessCommandException("%s is an unknown key, it will be ignored." % k)
-        #checkCellCmd = ("cellid = (AdminControl.getCell()); if cellid != %s: print 'ERROR: cell does not match configuration file.'; sys.exit(1)" % cellDict['name'])
-        #tempCmdList.append(checkCellCmd)
-        for item in clusterCmdList:
-            tempCmdList.append(item)
-        for item in clusterMemberCmdlist:
-            tempCmdList.append(item)
-        self.logger.debug("generateCommands: tempCmdList = %s " % tempCmdList)
-        self.cmdList = [cellList, dmgrList, tempCmdList]
-        self.logger.debug("generateCommands: self.cmdList = %s " % self.cmdList)
-        return self.cmdList
 
     def processServer(self, k=None, v=None):
         self.logger.debug("processServer: key=%s, value=%s" % (k, v))
@@ -256,7 +250,7 @@ class ProcessCommands:
         self.logger.debug("processSecrurity: key=%s, value=%s" % (k, v))
         if k and v != None:
             self.validateScope(v, 'processPropertySet')
-            self.jaasAuthDataList = AdminConfig.list(k, AdminConfig.getid(v['scope'])).split('\r\n')
+            self.jaasAuthDataList = AdminConfig.list(k, AdminConfig.getid('%sSecurity:/' % v['scope'])).split('\r\n')
             self.logger.debug("processSecrurity: jaasAuthDataList=%s"% self.jaasAuthDataList)
             for key in v.keys():
                 if key == 'alias':
@@ -295,8 +289,8 @@ class ProcessCommands:
                         for key in v.keys():
                             if key != 'scope':
                                 attrList.append([key, v[key]])
-                        self.logger.debug("processSecrurity: command=AdminConfig.create(%s, %s, %s)" % (k, AdminConfig.getid(v['scope']), attrList))
-                        AdminConfig.create(k, AdminConfig.getid(v['scope']), attrList)
+                        self.logger.debug("processSecrurity: command=AdminConfig.create(%s, %s, %s)" % (k, AdminConfig.getid('%sSecurity:/' % v['scope']), attrList))
+                        AdminConfig.create(k, AdminConfig.getid('%sSecurity:/' % v['scope']), attrList)
                     #end-if
                 #end-if
             #end-for

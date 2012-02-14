@@ -73,11 +73,9 @@ class TestProcessConfigND(unittest.TestCase):
         shutil.rmtree(props['tmpPath'])
 
     def testXMLReadConfig(self):
-        self.logger.info("TestProcessConfigND:testXMLReadConfig")
         self.assertEqual(self.itemDict, self.pc.readConfig(xml=self.xml))
 
     def testXMLFileReadConfig(self):
-        self.logger.info("TestProcessConfigND:testXMLFileReadConfig")
         fh = open(props['tmpPath'] + os.sep + 'env.xml','w')
         fh.write(self.xml)
         fh.close()
@@ -87,7 +85,6 @@ class TestProcessConfigND(unittest.TestCase):
         fh.close()
 
     def testXMLReadException(self):
-        self.logger.info("TestProcessConfigND:testXMLReadException")
         xml = None
         try:
             self.pc.readConfig(xml=xml),
@@ -115,11 +112,9 @@ class TestProcessConfigBASE(unittest.TestCase):
         shutil.rmtree(props['tmpPath'])
 
     def testXMLReadConfig(self):
-        self.logger.info("TestProcessConfigBASE:testXMLReadConfig")
         self.assertEqual(self.itemDict, self.pc.readConfig(xml=self.xml))
 
     def testXMLFileReadConfig(self):
-        self.logger.info("TestProcessConfigBASE:testXMLFileReadConfig")
         fh = open(props['tmpPath'] + os.sep + 'env.xml','w')
         fh.write(self.xml)
         fh.close()
@@ -129,7 +124,6 @@ class TestProcessConfigBASE(unittest.TestCase):
         fh.close()
 
     def testXMLReadException(self):
-        self.logger.info("TestProcessConfigBASE:testXMLReadException")
         xml = None
         try:
             self.pc.readConfig(xml=xml),
@@ -140,6 +134,6 @@ class TestProcessConfigBASE(unittest.TestCase):
 
 if __name__ == '__main__' or __name__ == 'main':
     suite = unittest.TestLoader().loadTestsFromTestCase(TestProcessConfigBASE)
-    unittest.TextTestRunner().run(suite)
+    unittest.TextTestRunner(verbosity=2).run(suite)
     suite = unittest.TestLoader().loadTestsFromTestCase(TestProcessConfigND)
-    unittest.TextTestRunner().run(suite)
+    unittest.TextTestRunner(verbosity=2).run(suite)

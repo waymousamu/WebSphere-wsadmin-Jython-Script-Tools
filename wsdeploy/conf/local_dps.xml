@@ -85,11 +85,19 @@
 				<ConnectionPool maxConnections="50" minConnections="1" testConnection="true" testConnectionInterval="3"/>
 			</DataSource>
 		</JDBCProvider>
-		<builtin_mqprovider name="WebSphere MQ JMS Provider">
+		<JMSProvider name="WebSphere MQ JMS Provider">
 			<MQQueueConnectionFactory name="DovetailJMSXAQueueConnectionFactory" jndiName="dovetail/jms/XAQueueConnectionFactory" xaRecoveryAuthAlias="&node01name;/&j2cAlias01;" queueManager="&mqqmname;" host="&mqhostname;" port="&mqport;" channel="&mqchannel;">
 				<ConnectionPool maxConnections="200"/>
 				<MappingModule mappingConfigAlias="DefaultPrincipalMapping"/>
 			</MQQueueConnectionFactory>
+
+			<MQQueueConnectionFactory name="QCF1" jndiName="jms/QCF1" XAEnabled="true" queueManager="QMGR1" host="localhost" port="1415" channel="CH1" transportType="BINDINGS_THEN_CLIENT" tempModel="SYSTEM.DEFAULT.MODEL.QUEUE" CCSID="819" failIfQuiesce="true" pollingInterval="5000" rescanInterval="5000" sslResetCount="0">
+				<J2EEResourcePropertySet>
+					<connectionPool purgePolicy="EntirePool" maxConnections="200"/>
+      				<mapping mappingConfigAlias="DefaultPrincipalMapping"/>
+				</J2EEResourcePropertySet>
+			</MQQueueConnectionFactory>
+
 			<MQQueueConnectionFactory name="DovetailJMSQueueConnectionFactory" jndiName="dovetail/jms/QueueConnectionFactory" queueManager="&mqqmname;" host="&mqhostname;" port="&mqport;" channel="&mqchannel;">
 				<ConnectionPool maxConnections="200"/>
 				<MappingModule mappingConfigAlias="DefaultPrincipalMapping"/>
@@ -118,7 +126,7 @@
 			<MQQueue name="OFCHVResponseMessageReceiveQueue" jndiName="dovetail/jms/OFCHVResponseMessageReceiveQueue" persistence="PERSISTENT" baseQueueName="OFCHVResponseMessageReceiveQueue" baseQueueManagerName="&mqqmname;" queueManagerHost="&mqhostname;" queueManagerPort="&mqport;" serverConnectionChannelName="&mqchannel;"/>
 			<MQQueue name="OFCLVRequestMessageSendQueue" jndiName="dovetail/jms/OFCLVRequestMessageSendQueue" persistence="PERSISTENT" baseQueueName="OFCLVRequestMessageSendQueue" baseQueueManagerName="&mqqmname;" queueManagerHost="&mqhostname;" queueManagerPort="&mqport;" serverConnectionChannelName="&mqchannel;"/>
 			<MQQueue name="OFCLVResponseMessageReceiveQueue" jndiName="dovetail/jms/OFCLVResponseMessageReceiveQueue" persistence="PERSISTENT" baseQueueName="OFCLVResponseMessageReceiveQueue" baseQueueManagerName="&mqqmname;" queueManagerHost="&mqhostname;" queueManagerPort="&mqport;" serverConnectionChannelName="&mqchannel;"/>
-		</builtin_mqprovider>
+		</JMSProvider>
 		<J2CResourceAdapter name="SIB JMS Resource Adapter">
 			<J2CActivationSpec jndiName="jms/CacheUpdateTopic" name="CacheUpdateTopic" destinationJndiName="dovetail/jms/CacheUpdateTopic">
 				<J2EEResourceProperty name="busName" type="java.lang.String" value="&sibname;"/>
