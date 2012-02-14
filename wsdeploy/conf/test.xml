@@ -1,0 +1,104 @@
+<?xml version="1.0"?>
+<!DOCTYPE page [
+	<!ENTITY envid "mp4">
+	<!ENTITY cellname "cell">
+	<!ENTITY dmgrnodebaseport "10">
+  	<!ENTITY dmgrname "dmgr">
+  	<!ENTITY dmgrhostname "dmgrhostname">
+  	<!ENTITY allnodebaseport "10">
+  	<!ENTITY allnodesoapport "878">
+  	<!ENTITY node01name "node01">
+  	<!ENTITY node01hostname "node01hostname">
+  	<!ENTITY node01baseport "11">
+  	<!ENTITY node01soapport "878">
+  	<!ENTITY node02name "node02">
+  	<!ENTITY node02hostname "node02hostname">
+  	<!ENTITY node02baseport "12">
+  	<!ENTITY app01name "app01">
+  	<!ENTITY cluster01name "cluster01">
+  	<!ENTITY server01name "server01">
+  	<!ENTITY server02name "server02">
+  	<!ENTITY oracleprovider "EUI_Oracle_JDBCProvider">
+]>
+<env
+	xmlns:dmgr="http://www.xyz.com/dmgr"
+	xmlns:node="http://www.xyz.com/node"
+	xmlns:server="http://www.xyz.com/server"
+	xmlns:app="http://www.xyz.com/app"
+	xmlns:cluster="http://www.xyz.com/cluster"
+	xmlns:cell="http://www.xyz.com/cell"
+	xmlns:env="http://www.xyz.com/env"
+>
+	<env:name>&envid;</env:name>
+	<cell>
+		<cell:name>&envid;&cellname;</cell:name>
+	</cell>
+	<dmgr>
+		<dmgr:name>&envid;&dmgrname;</dmgr:name>
+		<dmgr:hostname>&envid;&dmgrhostname;</dmgr:hostname>
+		<dmgr:soapport>&allnodebaseport;&allnodesoapport;</dmgr:soapport>
+	</dmgr>
+	<node>
+		<node:name>&envid;&node01name;</node:name>
+		<node:hostname>&node01hostname;</node:hostname>
+		<node:soapport>&node01baseport;&allnodesoapport;</node:soapport>
+	</node>
+	<node>
+		<node:name>&envid;&node02name;</node:name>
+		<node:hostname>&node02hostname;</node:hostname>
+		<node:soapport>&node02baseport;&allnodesoapport;</node:soapport>
+	</node>
+	<cluster>
+		<cluster:name>&app01name;&cluster01name;</cluster:name>
+		<cluster:member>&app01name;&server01name;</cluster:member>
+		<cluster:member>&app01name;&server02name;</cluster:member>
+	</cluster>
+	<app>
+		<app:name>&app01name;</app:name>
+		<app:scope>&app01name;&cluster01name;</app:scope>
+	</app>
+	<server>
+		<server:name>&app01name;&server01name;</server:name>
+		<server:node>&envid;&node01name;</server:node>
+		<server:cluster>&app01name;&cluster01name;</server:cluster>
+	</server>
+	<server>
+		<server:name>&app01name;&server02name;</server:name>
+		<server:node>&envid;&node02name;</server:node>
+		<server:cluster>&app01name;&cluster01name;</server:cluster>
+	</server>
+	<JAASAuthData>
+		<alias>dev1Alias</alias>
+		<userId>wasdev1</userId>
+		<password>sawdev1</password>
+		<description>EUI Oracle Alias</description>
+	</JAASAuthData>
+	<JDBCProvider>
+		<scope>Cell=&envid;&cellname;</scope>
+		<name>&oracleprovider;</name>
+		<databaseType>Oracle</databaseType>
+		<providerType>Oracle JDBC Driver</providerType>
+		<implementationType>Connection pool data source</implementationType>
+		<classpath>${ORACLE_JDBC_DRIVER_PATH}/ojdbc5.jar</classpath>
+		<description>EUI Oracle JDBC Driver</description>		
+ 	</JDBCProvider>
+ 	<DataSource>
+ 		<JDBCProvider>&oracleprovider;</JDBCProvider>
+		<name>DEV1</name>
+		<jndiName>jdbc/DEV1LT</jndiName>
+		<componentManagedAuthenticationAlias></componentManagedAuthenticationAlias>
+		<description>EUI Oracle DataSource</description>
+		<J2EEResourcePropertySet>
+			<J2EEResourceProperty>
+				<name>URL</name>
+				<value>jdbc:oracle:thin:@tboraa1std.beprod01.eoc.test:1526:DEV1</value>
+			</J2EEResourceProperty>
+		</J2EEResourcePropertySet>
+		<connectionPool>
+			<connectionTimeout>240</connectionTimeout>
+			<maxConnections>20</maxConnections>
+			<unusedTimeout>900</unusedTimeout>
+			<purgePolicy>EntirePool</purgePolicy>
+		</connectionPool>
+	</DataSource>
+</env>

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="windows-1252"?>
+<!DOCTYPE page [
+	<!ENTITY envid "local_base">
+	<!ENTITY cellname "Cell01">
+  	<!ENTITY node01name "Node01">
+  	<!ENTITY node01hostname "localhost">
+	<!ENTITY node01soapport "8880">
+  	<!ENTITY app01name "AMS_TZEAR">
+  	<!ENTITY server01name "server1">
+	<!ENTITY runAsUser "wsadmin">
+	<!ENTITY runAsGroup "wsadmins">
+	<!ENTITY initialHeapSize "2048">
+	<!ENTITY maximumHeapSize "2048">
+	<!ENTITY genericJvmArguments "-Xlp">
+	<!ENTITY jdbcProvider01name "XAEVPSJDBCProvider">
+	<!ENTITY jdbcProvider02name "EVPSJDBCProvider">
+	<!ENTITY j2cAlias01 "local_oracle_alias">
+	<!ENTITY j2cAlias01usr "swaymouth">
+	<!ENTITY j2cAlias01pwd "{xor}LDo8LTor">
+	<!ENTITY jndiDSPrefix "weblogic.jdbc.jts.">
+	<!ENTITY jdbcDSName01 "Q5DataSource">
+	<!ENTITY jdbcDSName02 "Q5DDLDataSource">
+	<!ENTITY jdbcDSName03 "Q5HistDataSource">
+	<!ENTITY jdbcDSName04 "Q5HistDDLDataSource">
+	<!ENTITY mqhostname "localhost">
+	<!ENTITY mqport "1414">
+	<!ENTITY mqqmname "QM_HP8200SWaymouth">
+	<!ENTITY mqchannel "WAS_TO_QM">
+	<!ENTITY sibname "DovetailSIBus">
+]>
+<env name="&envid;">
+	<install dir="c:/ibm/websphere7_64_XX" dmgr="" nodes="&node01name;"/>
+	<Security>
+		<JAASAuthData alias="&node01name;/&j2cAlias01;" userId="&j2cAlias01usr;" password="&j2cAlias01pwd;"/>
+	</Security>
+	<Cell name="&cellname;">
+		<Node name="&node01name;" hostname="&node01hostname;" soapport="&node01soapport;">
+			<Server name="&server01name;">
+				<JavaProcessDef>
+					<ProcessExecution runAsUser="&runAsUser;" runAsGroup="&runAsGroup;"/>
+					<JavaVirtualMachine initialHeapSize="&initialHeapSize;" maximumHeapSize="&maximumHeapSize;" genericJvmArguments="&genericJvmArguments;"/>
+				</JavaProcessDef>
+			</Server>
+		</Node>
+		<JDBCProvider name="&jdbcProvider01name;" description="&jdbcProvider01name;" providerType="Oracle JDBC Driver (XA)" implementationClassName="oracle.jdbc.xa.client.OracleXADataSource" xa="true">
+			<classpath>${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar</classpath>
+			<DataSource name="&jdbcDSName01;" jndiName="&jndiDSPrefix;&jdbcDSName01;" description="&jdbcDSName01;" providerType="Oracle JDBC Driver (XA)" authDataAlias="&node01name;/&j2cAlias01;" xaRecoveryAuthAlias="&node01name;/&j2cAlias01;" statementCacheSize="600" datasourceHelperClassname="com.ibm.websphere.rsadapter.Oracle11gDataStoreHelper">
+				<J2EEResourcePropertySet>
+					<J2EEResourceProperty name="useRRASetEquals" type="java.lang.String" value="true" required="false"/>
+					<J2EEResourceProperty name="transactionBranchesLooselyCoupled" type="java.lang.Boolean" value="true"/>
+					<J2EEResourceProperty name="validateNewConnection" type="java.lang.Boolean" value="true"/>
+					<J2EEResourceProperty name="validateNewConnectionRetryCount" type="java.lang.Integer" value="5"/>
+					<J2EEResourceProperty name="validateNewConnectionRetryInterval" type="java.lang.Long" value="5"/>
+				</J2EEResourcePropertySet>
+				<ConnectionPool maxConnections="1000" minConnections="5" testConnection="true" testConnectionInterval="3"/>
+			</DataSource>
+		</JDBCProvider>
+	</Cell>
+</env>

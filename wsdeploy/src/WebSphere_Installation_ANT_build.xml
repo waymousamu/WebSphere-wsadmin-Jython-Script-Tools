@@ -1,0 +1,5098 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<project name="DeployWAS60" basedir="." default="audit">
+
+	<description>
+
+		Automates the deployment of Websphere environments.
+
+		This script is intended to provide a centralised mechanism for installing
+
+		and configuring Websphere and its associated components. This script
+
+		supercedes multiple existing scripts.
+
+		The only external dependency should be a configuration file which
+		contains
+
+		the parameters that are unique to the particular installation. This
+
+		configuration file is one of the confuguration files under:
+
+		http://unixdocs/applications/EOS/ENVIRONMENT-SUPPORT/R5WAS6/
+
+		Required definitions:
+
+		spec: file containing the build configuration
+
+		DeployType: type of deployment (mgr|node|edge)
+
+		Note: This script is a mashup of two separately developed scripts created
+		by
+
+		Tom Livingstone and Sam Waymouth. The auditing targets and macros were
+
+		developed separately from the deployment targets and macros. Because
+		of
+
+		that, there is some duplication/redundancy in the macros, and different
+
+		approaches were taken with deployment and audit rules.
+
+		This script needs tidying to eliminate redundancies and make the use of
+
+		targets and macros consistent throughout the script.
+
+	</description>
+
+	<taskdef resource="net/sf/antcontrib/antcontrib.properties" />
+
+	<property name="tempdir" value="temp" />
+
+	<property name="ssh.keyfile" value="ssh/id_dsa" />
+
+	<property name="bin.home" value="/home/local/bin" />
+
+	<!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ PRIMARY
+		TARGETS +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+
+	<target name="deploy" description="Deploy WAS6 to the requisite platform"
+
+		depends="audit,buildWAS">
+
+		<echo />
+
+		<echo>Deployment complete</echo>
+
+		<echo />
+
+		<copy file="logs/build.log" tofile="${logdir}/deploy.log" />
+
+		<gzip src="${logdir}/deploy.log" destfile="${logdir}/deploy.log.gz" />
+
+		<delete file="${logdir}/deploy.log" />
+
+	</target>
+
+	<target name="audit"
+
+		description="Audit existing installation against build configuration"
+
+		depends="Init,AuditIPC,AuditDisk,AuditNet,AuditEnv,AuditDNS">
+
+		<property name="ant.enable.asserts" value="true" />
+
+		<condition property="deploy.audit.ok">
+
+			<not>
+
+				<or>
+
+					<isset property="audit.ipc.failed" />
+
+					<isset property="audit.disk.failed" />
+
+					<isset property="audit.net.failed" />
+
+					<isset property="audit.env.failed" />
+
+					<isset property="audit.dns.failed" />
+
+				</or>
+
+			</not>
+
+		</condition>
+
+		<!--echo>ipc failed = ${audit.ipc.failed}</echo> <echo>disk failed = ${audit.disk.failed}</echo>
+			<echo>net failed = ${audit.net.failed}</echo> <echo>env failed = ${audit.env.failed}</echo>
+			<echo>dns failed = ${audit.dns.failed}</echo -->
+
+		<echo />
+
+		<echo>Audit complete</echo>
+
+		<echo />
+
+		<!-- TOML DEBUGGING<assert name="deploy.audit.ok"/> -->
+
+		<copy file="logs/build.log" tofile="${logdir}/audit.log" />
+
+		<gzip src="${logdir}/audit.log" destfile="${logdir}/audit.log.gz" />
+
+		<delete file="${logdir}/audit.log" />
+
+	</target>
+
+	<!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ UTILITY
+		MACROS +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+
+	<macrodef name="ssh-cmdp">
+
+		<attribute name="host" />
+
+		<attribute name="command" />
+
+		<attribute name="outputproperty" />
+
+		<sequential>
+
+			<!-- <echo>ssh-cmdp::@{host}:@{outputproperty}:@{command}</echo> -->
+
+			<trycatch property="err.ssh-cmdp.@{host}">
+
+				<try>
+
+					<sshexec host="@{host}" username="root" keyfile="${ssh.keyfile}"
+
+						trust="true" command="/usr/ucb/echo -n `@{command}`"
+
+						outputproperty="@{outputproperty}" failonerror="true" />
+
+				</try>
+
+				<catch>
+
+					<echo level="error">@{host}: Caught exception: ${err.ssh-cmdp.@{host}}
+					</echo>
+
+				</catch>
+
+				<finally>
+
+					<var name="err.ssh-cmdp.@{host}" unset="true" />
+
+				</finally>
+
+			</trycatch>
+
+		</sequential>
+
+	</macrodef>
+
+	<macrodef name="ssh-cmdf">
+
+		<attribute name="host" />
+
+		<attribute name="command" />
+
+		<attribute name="outputfile" />
+
+		<sequential>
+
+			<trycatch property="err.ssh-cmdf.@{host}">
+
+				<try>
+
+					<sshexec host="@{host}" username="root" keyfile="${ssh.keyfile}"
+
+						trust="true" command="@{command}" output="@{outputfile}"
+
+						failonerror="true" />
+
+				</try>
+
+				<catch>
+
+					<echo level="error">@{host}: Caught exception: ${err.ssh-cmdf.@{host}}
+					</echo>
+
+				</catch>
+
+				<finally>
+
+					<var name="err.ssh-cmdf.@{host}" unset="true" />
+
+				</finally>
+
+			</trycatch>
+
+		</sequential>
+
+	</macrodef>
+
+	<macrodef name="ssh-getfile">
+
+		<attribute name="host" />
+
+		<attribute name="rpath" />
+
+		<attribute name="lpath" />
+
+		<sequential>
+
+			<trycatch property="err.ssh-getfile.@{host}">
+
+				<try>
+
+					<scp remotefile="root@@@{host}:@{rpath}" keyfile="${ssh.keyfile}"
+
+						passphrase="" localtofile="@{lpath}" trust="true" failonerror="true" />
+
+				</try>
+
+				<catch>
+
+					<echo level="error">@{host}: Caught exception:
+						${err.ssh-getfile.@{host}}</echo>
+
+				</catch>
+
+				<finally>
+
+					<var name="err.ssh-getfile.@{host}" unset="true" />
+
+				</finally>
+
+			</trycatch>
+
+		</sequential>
+
+	</macrodef>
+
+	<macrodef name="ssh-getdiskfree">
+
+		<attribute name="host" />
+
+		<attribute name="dir" />
+
+		<attribute name="outputproperty" />
+
+		<attribute name="scale" default="kb" />
+
+		<sequential>
+
+			<trycatch property="err.ssh-getdiskfree.@{host}">
+
+				<try>
+
+					<sshexec host="@{host}" username="root" keyfile="${ssh.keyfile}"
+
+						command="if test -d @{dir}; then df @{dir} |sed -e 's/.*://' -e 's/ .*//'; else echo 0; fi"
+
+						outputproperty="blocks.@{host}" trust="true" failonerror="true" />
+
+					<if>
+
+						<bool>
+
+							<or>
+
+								<not>
+									<isset property="blocks.@{host}" />
+								</not>
+
+								<equals arg1="${blocks.@{host}}" arg2="" trim="yes" />
+
+							</or>
+
+						</bool>
+
+						<else>
+
+							<if>
+
+								<equals arg1="@{scale}" arg2="kb" casesensitive="no"
+									trim="yes" />
+
+								<then>
+
+									<math datatype="int" result="@{outputproperty}" operation="/"
+										operand1="2" operand2="${blocks.@{host}}" />
+
+								</then>
+
+								<elseif>
+
+									<equals arg1="@{scale}" arg2="mb" casesensitive="no"
+										trim="yes" />
+
+									<then>
+
+										<math datatype="int" result="@{outputproperty}"
+											operation="/" operand1="2048" operand2="${blocks.@{host}}" />
+
+									</then>
+
+								</elseif>
+
+								<elseif>
+
+									<equals arg1="@{scale}" arg2="gb" casesensitive="no"
+										trim="yes" />
+
+									<then>
+
+										<math datatype="float" result="@{outputproperty}"
+											operation="/" operand1="2097152" operand2="${blocks.@{host}}" />
+
+									</then>
+
+								</elseif>
+
+								<else>
+
+									<fail>Invalid scale: @{scale}</fail>
+
+								</else>
+
+							</if>
+
+						</else>
+
+					</if>
+
+				</try>
+
+				<catch>
+
+					<echo level="error">@{host}: Caught exception:
+						${err.ssh-getdiskfree.@{host}}</echo>
+
+					<property name="@{outputproperty}" value="0" />
+
+				</catch>
+
+				<finally>
+
+					<var name="blocks.@{host}" unset="true" />
+
+					<var name="err.ssh-getdiskfree.@{host}" unset="true" />
+
+				</finally>
+
+			</trycatch>
+
+		</sequential>
+
+	</macrodef>
+
+	<macrodef name="loadsystemsettings">
+
+		<attribute name="host" />
+
+		<attribute name="prefix" default="deploy.systemsettings" />
+
+		<sequential>
+
+			<trycatch property="err.loadsystemsettings.@{host}">
+
+				<try>
+
+					<ssh-getfile host="@{host}" rpath="/etc/system"
+						lpath="${deploy.builddir}/system.@{host}" />
+
+					<loadproperties srcFile="${deploy.builddir}/system.@{host}">
+
+						<filterchain>
+
+							<linecontainsregexp>
+
+								<regexp pattern="^set *" />
+
+							</linecontainsregexp>
+
+							<!-- <deletecharacters chars="\t\r"/> -->
+
+							<tokenfilter>
+
+								<replaceregex pattern="^set .*:[^_]+_(\w+)=(.*)"
+									replace="@{prefix}.\1=\2" flags="sg" />
+
+								<replaceregex pattern="^set (\w+)=(.*)" replace="@{prefix}.\1=\2"
+									flags="sg" />
+
+							</tokenfilter>
+
+						</filterchain>
+
+					</loadproperties>
+
+					<!-- <echoproperties prefix="@{prefix}"/> -->
+
+				</try>
+
+				<catch>
+
+					<echo level="error">@{host}: Caught exception:
+						${err.loadsystemsettings.@{host}}</echo>
+
+				</catch>
+
+				<finally>
+
+					<var name="err.loadsystemsettings.@{host}" unset="true" />
+
+				</finally>
+
+			</trycatch>
+
+		</sequential>
+
+	</macrodef>
+
+	<!-- Iterate over two parallel lists calling the specified target for each
+		tuple. The target expects two properties: targetname.p1 targetname.p2 This
+		macro is NOT THREAD-SAFE !!! -->
+
+	<macrodef name="map2">
+
+		<attribute name="list1" />
+
+		<attribute name="list2" />
+
+		<attribute name="target" />
+
+		<attribute name="inheritall" default="false" />
+
+		<sequential>
+
+			<var name="map2.p1" unset="true" />
+
+			<var name="map2.p2" unset="true" />
+
+			<var name="map2.tail1" unset="true" />
+
+			<var name="map2.tail2" unset="true" />
+
+			<propertyregex property="map2.p1" input="@{list1}"
+				regexp="([^,]+)" select="\1" />
+
+			<propertyregex property="map2.p2" input="@{list2}"
+				regexp="([^,]+)" select="\1" />
+
+			<propertyregex property="map2.tail1" input="@{list1}"
+				regexp="[^,]+,(.*)" select="\1" />
+
+			<propertyregex property="map2.tail2" input="@{list2}"
+				regexp="[^,]+,(.*)" select="\1" />
+
+			<!-- <echo>map2: map2.p1=${map2.p1}, map2.tail1=${map2.tail1}</echo> <echo>
+				: map2.p2=${map2.p2}, map2.tail2=${map2.tail2}</echo> -->
+
+			<antcall target="@{target}" inheritall="@{inheritall}">
+
+				<param name="@{target}.p1" value="${map2.p1}" />
+
+				<param name="@{target}.p2" value="${map2.p2}" />
+
+			</antcall>
+
+			<if>
+
+				<bool>
+
+					<or>
+
+						<isset property="map2.tail1" />
+
+						<isset property="map2.tail2" />
+
+					</or>
+
+				</bool>
+
+				<then>
+
+					<map2 target="@{target}" inheritall="@{inheritall}" list1="${map2.tail1}"
+						list2="${map2.tail2}" />
+
+				</then>
+
+			</if>
+
+			<var name="map2.p1" unset="true" />
+
+			<var name="map2.p2" unset="true" />
+
+			<var name="map2.tail1" unset="true" />
+
+			<var name="map2.tail2" unset="true" />
+
+		</sequential>
+
+	</macrodef>
+
+	<!-- Iterate over two parallel lists calling the specified target for each
+		tuple. The difference between this macro and map2 is that this macro expects
+		there to be two entries in the second list for every entry in the first list.
+		The target expects two properties: targetname.p1 targetname.p2 This macro
+		is NOT THREAD-SAFE !!! -->
+
+	<macrodef name="map2pair">
+
+		<attribute name="list1" />
+
+		<attribute name="list2" />
+
+		<attribute name="target" />
+
+		<attribute name="stopon" default="" />
+
+		<attribute name="only" default="" />
+
+		<attribute name="inheritall" default="false" />
+
+		<sequential>
+
+			<var name="map2pair.p1" unset="true" />
+
+			<var name="map2pair.p2" unset="true" />
+
+			<var name="map2pair.tail1" unset="true" />
+
+			<var name="map2pair.tail2" unset="true" />
+
+			<propertyregex property="map2pair.p1" input="@{list1}"
+				regexp="([^,]+)" select="\1" />
+
+			<propertyregex property="map2pair.p2" input="@{list2}"
+				regexp="([^,]+,[^,]+)" select="\1" />
+
+			<propertyregex property="map2pair.tail1" input="@{list1}"
+				regexp="[^,]+,(.*)" select="\1" />
+
+			<propertyregex property="map2pair.tail2" input="@{list2}"
+				regexp="[^,]+,[^,]+,(.*)" select="\1" />
+
+			<echo level="debug">map2pair: map2pair.p1=${map2pair.p1}</echo>
+
+			<echo level="debug"> : map2pair.p2=${map2pair.p2}</echo>
+
+			<echo level="debug">map2pair: stopon="@{stopon}" only="@{only}"</echo>
+
+			<if>
+
+				<bool>
+
+					<or>
+
+						<equals arg1="@{only}" arg2="" trim="yes" />
+
+						<equals arg1="@{only}" arg2="${map2pair.p1}" trim="yes" />
+
+					</or>
+
+				</bool>
+
+				<then>
+
+					<antcall target="@{target}" inheritall="@{inheritall}">
+
+						<param name="@{target}.p1" value="${map2pair.p1}" />
+
+						<param name="@{target}.p2" value="${map2pair.p2}" />
+
+					</antcall>
+
+				</then>
+
+			</if>
+
+			<if>
+
+				<bool>
+
+					<and>
+
+						<or>
+
+							<isset property="map2pair.tail1" />
+
+							<isset property="map2pair.tail2" />
+
+						</or>
+
+						<not>
+							<equals arg1="@{stopon}" arg2="${map2pair.p1}" trim="yes" />
+						</not>
+
+					</and>
+
+				</bool>
+
+				<then>
+
+					<map2pair target="@{target}" inheritall="@{inheritall}"
+
+						list1="${map2pair.tail1}" list2="${map2pair.tail2}" stopon="@{stopon}"
+						only="@{only}" />
+
+				</then>
+
+			</if>
+
+			<var name="map2pair.p1" unset="true" />
+
+			<var name="map2pair.p2" unset="true" />
+
+			<var name="map2pair.tail1" unset="true" />
+
+			<var name="map2pair.tail2" unset="true" />
+
+		</sequential>
+
+	</macrodef>
+
+	<macrodef name="cmphostalias">
+
+		<attribute name="host" />
+
+		<attribute name="alias" />
+
+		<attribute name="setonfailure" />
+
+		<sequential>
+
+			<!-- <echo>cmphostlias: host=@{host}, alias=@{alias} setonfailure=@{setonfailure}</echo> -->
+
+			<!-- get IP addresses from host -->
+
+			<ssh-cmdp host="@{host}"
+
+				command="/usr/sbin/ifconfig -a | awk '/inet /{print $$2}' | fgrep -v 127.0.0.1"
+
+				outputproperty="p.cmphostalias.@{host}" />
+
+			<!-- get IP addresses from alias -->
+
+			<ssh-cmdp host="@{alias}"
+
+				command="/usr/sbin/ifconfig -a | awk '/inet /{print $$2}' | fgrep -v 127.0.0.1"
+
+				outputproperty="p.cmphostalias.@{alias}" />
+
+			<!-- <echo> : @{host} gives ${p.cmphostalias.@{host}} </echo> <echo> :
+				@{alias} gives ${p.cmphostalias.@{alias}} </echo> -->
+
+			<!-- perform validations -->
+
+			<if>
+
+				<bool>
+
+					<not>
+						<isset property="p.cmphostalias.@{host}" />
+					</not>
+
+				</bool>
+
+				<then>
+
+					<echo level="warning">@{host}: unable to determine host IP addresses
+					</echo>
+
+					<property name="@{setonfailure}" value="true" />
+
+				</then>
+
+				<elseif>
+
+					<bool>
+
+						<not>
+							<isset property="p.cmphostalias.@{alias}" />
+						</not>
+
+					</bool>
+
+					<then>
+
+						<echo level="warning">@{alias}: unable to determine alias IP addresses
+						</echo>
+
+						<property name="@{setonfailure}" value="true" />
+
+					</then>
+
+				</elseif>
+
+				<elseif>
+
+					<bool>
+
+						<not>
+							<equals arg1="${p.cmphostalias.@{host}}" arg2="${p.cmphostalias.@{alias}}"
+								trim="yes" />
+						</not>
+
+					</bool>
+
+					<then>
+
+						<echo level="warning">@{alias}(@{host}): alias
+							(${p.cmphostalias.@{alias}}) .ne. host
+							(${p.cmphostalias.@{host}})</echo>
+
+						<property name="@{setonfailure}" value="true" />
+
+					</then>
+
+				</elseif>
+
+				<else>
+
+					<echo>@{alias}(@{host}): IP addresses match OK
+						(${p.cmphostalias.@{host}})</echo>
+
+				</else>
+
+			</if>
+
+			<var name="p.cmphostalias.@{host}" unset="true" />
+
+			<var name="p.cmphostalias.@{alias}" unset="true" />
+
+		</sequential>
+
+	</macrodef>
+
+	<!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ INITIALIZATION
+		TARGETS +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+
+	<target name="Init" description="Load config and check basic connectivity"
+
+		depends="usage,builddir,loadspec">
+
+		<tstamp />
+
+		<property name="logdir" value="logs/${env}-${DSTAMP}-${TSTAMP}" />
+
+		<mkdir dir="${logdir}" />
+
+		<echoproperties destfile="${logdir}/properties.txt" />
+
+		<gzip src="${logdir}/properties.txt" destfile="${logdir}/properties.txt.gz" />
+
+		<delete file="${logdir}/properties.txt" />
+
+	</target>
+
+	<target name="builddir" description="Ensure build directory is present">
+
+		<property name="deploy.builddir" value="${tempdir}" />
+
+		<mkdir dir="${tempdir}" />
+
+	</target>
+
+	<target name="loadspec" description="Load the specification file"
+
+		unless="env.host">
+
+		<property name="spec"
+			value="http://unixdocs/applications/EOS/ENVIRONMENT-SUPPORT/R62WAS61/${env}.xml" />
+
+		<propertyregex property="p.spec" input="${spec}" regexp=".*/([^/]+)"
+			select="\1" />
+
+		<echo />
+
+		<echo>PROCESSING SPECIFICATION : ${p.spec}</echo>
+
+		<echo />
+
+		<copy todir="${deploy.builddir}" flatten="true">
+
+			<resources>
+
+				<url url="${spec}" />
+
+			</resources>
+
+		</copy>
+
+		<xmlproperty prefix="spec" file="${deploy.builddir}/${p.spec}" />
+
+		<fail message="Unable to load configuration: ${spec}" unless="spec.env(name)" />
+
+		<!-- Load variable properties -->
+
+		<loadproperties srcfile="build.properties">
+
+			<filterchain>
+
+				<expandproperties />
+
+			</filterchain>
+
+		</loadproperties>
+
+		<var name="p.spec" unset="true" />
+
+	</target>
+
+	<target name="usage" description="Print usage message" unless="env">
+
+		<echo level="error">Undefined required property: env</echo>
+
+		<echo level="info">Usage: /usr/local/bin/ant -Denv=environment_name
+			[audit|deploy]</echo>
+
+		<fail>Undefined required property: env</fail>
+
+	</target>
+
+	<!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ INTERMEDIATE
+		TARGETS - AUDIT +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+
+	<!-- Auditing /etc/system IPC configuration -->
+
+	<target name="AuditIPC" description="Check the IPC configuration"
+
+		depends="Init">
+
+		<echo />
+
+		<echo>CHECKING IPC PARAMETER SETTINGS </echo>
+
+		<echo />
+
+		<for
+			list="${spec.env(dmgr)},${spec.env.fo.node(host)},${spec.env.is.node(host)}"
+
+			parallel="false" param="p.host">
+
+			<sequential>
+
+				<loadsystemsettings host="@{p.host}"
+					prefix="zdeploy.@{p.host}.system" />
+
+				<for
+					list="shmmax,shmseg,shmmni,semaem,semmni,semmap,semmns,semmsl,semopm,semmnu,semume,msgmap,msgmax,rlim_fd_cur"
+
+					param="p.sem">
+
+					<sequential>
+
+						<if>
+
+							<bool>
+
+								<islessthan arg1="${zdeploy.@{p.host}.system.@{p.sem}}"
+									arg2="${zdeploy.required.@{p.sem}}" />
+
+							</bool>
+
+							<then>
+
+								<echo level="warning">@{p.host}: @{p.sem}: too small -
+									${zdeploy.@{p.host}.system.@{p.sem}} (need
+									${zdeploy.required.@{p.sem}} )</echo>
+
+								<property name="audit.ipc.failed" value="true" />
+
+							</then>
+
+							<else>
+
+								<echo>@{p.host}: @{p.sem}: value is OK -
+									${zdeploy.@{p.host}.system.@{p.sem}}</echo>
+
+							</else>
+
+						</if>
+
+					</sequential>
+
+				</for>
+
+			</sequential>
+
+		</for>
+
+		<!-- flush out the generated properties -->
+
+		<propertyselector property="p.proplist" delimiter=","
+
+			match="(zdeploy\.[^\.]*\.system\..*)" select="\1" casesensitive="true" />
+
+		<for list="${p.proplist}" param="p.prop">
+
+			<sequential>
+
+				<var name="@{p.prop}" unset="true" />
+
+			</sequential>
+
+		</for>
+
+		<var name="p.proplist" unset="true" />
+
+	</target>
+
+	<!-- Auditing disk configuration -->
+
+	<target name="AuditDisk" description="Check disk space requirements"
+
+		depends="auditDiskAppsrvRoot,auditDiskDmgrRoot,auditDiskTmp" />
+
+
+
+	<target name="auditDiskAppsrvRoot" description="Check disk space requirements for appsrv root"
+
+		depends="Init,auditDiskAppsrvMount">
+
+		<echo />
+
+		<echo>CHECKING APPSRV ROOT DISK SPACE (min:
+			${zdeploy.required.disk.appsrvroot} MB)</echo>
+
+		<echo />
+
+		<for
+			list="${spec.env(dmgr)},${spec.env.fo.node(host)},${spec.env.is.node(host)}"
+
+			parallel="true" param="p.host">
+
+			<sequential>
+
+				<ssh-getdiskfree host="@{p.host}" dir="${spec.env(washome)}"
+					outputproperty="p.size.@{p.host}" scale="mb" />
+
+				<if>
+
+					<bool>
+
+						<not>
+							<isset property="p.size.@{p.host}" />
+						</not>
+
+					</bool>
+
+					<then>
+
+						<property name="p.size.@{p.host}" value="0" />
+
+					</then>
+
+				</if>
+
+				<if>
+
+					<bool>
+
+						<islessthan arg1="${p.size.@{p.host}}" arg2="${zdeploy.required.disk.appsrvroot}" />
+
+					</bool>
+
+					<then>
+
+						<echo level="warning">@{p.host}: no enough space - ${p.size.@{p.host}}
+							MB</echo>
+
+						<property name="audit.disk.failed" value="true" />
+
+					</then>
+
+					<else>
+
+						<echo>@{p.host}: value is OK - ${p.size.@{p.host}} MB</echo>
+
+					</else>
+
+				</if>
+
+				<var name="p.size.@{p.host}" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="auditDiskAppsrvMount" description="Check mount point configuration for appsrv root"
+
+		depends="Init">
+
+		<echo />
+
+		<echo>CHECKING APPSRV MOUNT POINT (${spec.env(washome)})</echo>
+
+		<echo />
+
+		<for
+			list="${spec.env(dmgr)},${spec.env.fo.node(host)},${spec.env.is.node(host)}"
+
+			parallel="true" param="p.host">
+
+			<sequential>
+
+				<ssh-cmdp host="@{p.host}"
+
+					command="/sbin/mount -p | fgrep ${spec.env(washome)} | awk '{print $$1}'"
+
+					outputproperty="p.mountfs.@{p.host}" />
+
+				<ssh-cmdp host="@{p.host}"
+
+					command="fgrep ${spec.env(washome)} /etc/vfstab | awk '{print $$1}'"
+
+					outputproperty="p.vfstab.@{p.host}" />
+
+				<if>
+
+					<bool>
+
+						<or>
+
+							<not>
+								<isset property="p.mountfs.@{p.host}" />
+							</not>
+
+							<equals arg1="${p.mountfs.@{p.host}}" arg2="" trim="true" />
+
+						</or>
+
+					</bool>
+
+					<then>
+
+						<echo level="warning">@{p.host}: not mounted on own file system</echo>
+
+						<property name="audit.disk.failed" value="true" />
+
+					</then>
+
+					<elseif>
+
+						<bool>
+
+							<or>
+
+								<not>
+									<isset property="p.vfstab.@{p.host}" />
+								</not>
+
+								<equals arg1="${p.vfstab.@{p.host}}" arg2="" trim="true" />
+
+							</or>
+
+						</bool>
+
+						<then>
+
+							<echo level="warning">@{p.host}: missing from /etc/vfstab</echo>
+
+							<property name="audit.disk.failed" value="true" />
+
+						</then>
+
+					</elseif>
+
+					<elseif>
+
+						<bool>
+
+							<not>
+								<equals arg1="${p.vfstab.@{p.host}}" arg2="${p.mountfs.@{p.host}}"
+									trim="yes" />
+							</not>
+
+						</bool>
+
+						<then>
+
+							<echo level="error">@{p.host}: vfstab (${p.vfstab.@{p.host}})
+								doesn't match current mount (${p.mountfs.@{p.host}})</echo>
+
+							<property name="audit.disk.failed" value="true" />
+
+						</then>
+
+					</elseif>
+
+					<else>
+
+						<echo>@{p.host}: appsrv root mount point OK -
+							${p.mountfs.@{p.host}}</echo>
+
+					</else>
+
+				</if>
+
+				<var name="p.mountfs.@{p.host}" unset="true" />
+
+				<var name="p.vfstab.@{p.host}" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="auditDiskDmgrRoot"
+
+		description="Check disk space requirements for deployment manager root"
+
+		depends="Init">
+
+		<echo />
+
+		<echo>CHECKING DEPLOYMENT MANAGER ROOT DISK SPACE ON ${spec.env(dmgr)}
+			(min: ${zdeploy.required.disk.dmgr} MB)</echo>
+
+		<echo />
+
+		<ssh-getdiskfree host="${spec.env(dmgr)}"
+			dir="${spec.env(profilehome)}/${spec.env(dmgrprofile)}/bin"
+			outputproperty="p.size" scale="mb" />
+
+		<if>
+
+			<bool>
+
+				<not>
+					<isset property="p.size" />
+				</not>
+
+			</bool>
+
+			<then>
+
+				<property name="p.size" value="0" />
+
+			</then>
+
+		</if>
+
+		<if>
+
+			<bool>
+
+				<equals arg1="${p.size}" arg2="0" trim="yes" />
+
+			</bool>
+
+			<then>
+
+				<echo level="warning">Disk space is zero - assuming directory not
+					installed.</echo>
+
+			</then>
+
+			<else>
+
+				<if>
+
+					<bool>
+
+						<islessthan arg1="${p.size}" arg2="${zdeploy.required.disk.dmgr}" />
+
+					</bool>
+
+					<then>
+
+						<echo level="warning">not enough space - ${p.size} MB</echo>
+
+						<property name="audit.disk.failed" value="true" />
+
+					</then>
+
+					<else>
+
+						<echo>value is OK - ${p.size} MB</echo>
+
+					</else>
+
+				</if>
+
+			</else>
+
+		</if>
+
+		<var name="p.size" unset="true" />
+
+	</target>
+
+	<target name="auditDiskTmp" description="Check disk space requirements for /tmp"
+
+		depends="Init">
+
+		<echo />
+
+		<echo>CHECKING ${zdeploy.disk.tmp} DISK SPACE (min:
+			${zdeploy.required.disk.tmp} MB)</echo>
+
+		<echo />
+
+		<for
+			list="${spec.env(dmgr)},${spec.env.fo.node(host)},${spec.env.is.node(host)}"
+
+			parallel="true" param="p.host">
+
+			<sequential>
+
+				<ssh-getdiskfree host="@{p.host}" dir="${zdeploy.disk.tmp}"
+					outputproperty="p.size.@{p.host}" scale="mb" />
+
+				<if>
+
+					<bool>
+
+						<not>
+							<isset property="p.size.@{p.host}" />
+						</not>
+
+					</bool>
+
+					<then>
+
+						<property name="p.size.@{p.host}" value="0" />
+
+					</then>
+
+				</if>
+
+				<if>
+
+					<bool>
+
+						<islessthan arg1="${p.size.@{p.host}}" arg2="${zdeploy.required.disk.tmp}" />
+
+					</bool>
+
+					<then>
+
+						<echo level="warning">@{p.host}: no enough space - ${p.size.@{p.host}}
+							MB</echo>
+
+						<property name="audit.disk.failed" value="true" />
+
+					</then>
+
+					<else>
+
+						<echo>@{p.host}: value is OK - ${p.size.@{p.host}} MB</echo>
+
+					</else>
+
+				</if>
+
+				<var name="p.size.@{p.host}" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<!-- Auditing network configuration -->
+
+	<target name="AuditNet" description="Check network requirements"
+
+		depends="Init,auditTCPWait,auditTCPFlush,auditTCPKeepalive,auditTCPConnreq" />
+
+
+
+	<target name="auditTCPWait" description="Check TCP Time Wait Interval"
+
+		depends="Init">
+
+		<echo />
+
+		<echo>CHECKING TCP TIME WAIT INTERVAL (rqd:
+			${zdeploy.required.tcp.timewait})</echo>
+
+		<echo />
+
+		<for
+			list="${spec.env(dmgr)},${spec.env.fo.node(host)},${spec.env.is.node(host)}"
+
+			parallel="true" param="p.host">
+
+			<sequential>
+
+				<ssh-cmdp host="@{p.host}"
+					command="/usr/sbin/ndd -get /dev/tcp tcp_time_wait_interval"
+					outputproperty="p.timewait.@{p.host}" />
+
+				<if>
+
+					<bool>
+
+						<equals arg1="${p.timewait.@{p.host}}" arg2="${zdeploy.required.tcp.timewait}"
+							trim="true" />
+
+					</bool>
+
+					<then>
+
+						<echo>@{p.host}: value is OK</echo>
+
+					</then>
+
+					<else>
+
+						<echo level="warning">@{p.host}: incorrect interval -
+							${p.timewait.@{p.host}}</echo>
+
+						<property name="audit.net.failed" value="true" />
+
+					</else>
+
+				</if>
+
+				<var name="p.timewait.@{p.host}" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="auditTCPFlush" description="Check TCP Fin Wait Flush Interval"
+
+		depends="Init">
+
+		<echo />
+
+		<echo>CHECKING TCP FIN WAIT2 FLUSH INTERVAL (rqd:
+			${zdeploy.required.tcp.finwaitflush})</echo>
+
+		<echo />
+
+		<for
+			list="${spec.env(dmgr)},${spec.env.fo.node(host)},${spec.env.is.node(host)}"
+
+			parallel="true" param="p.host">
+
+			<sequential>
+
+				<ssh-cmdp host="@{p.host}"
+					command="/usr/sbin/ndd -get /dev/tcp tcp_fin_wait_2_flush_interval"
+					outputproperty="p.finwait.@{p.host}" />
+
+				<if>
+
+					<bool>
+
+						<equals arg1="${p.finwait.@{p.host}}" arg2="${zdeploy.required.tcp.finwaitflush}"
+							trim="true" />
+
+					</bool>
+
+					<then>
+
+						<echo>@{p.host}: value is OK</echo>
+
+					</then>
+
+					<else>
+
+						<echo level="warning">@{p.host}: incorrect interval -
+							${p.finwait.@{p.host}}</echo>
+
+						<property name="audit.net.failed" value="true" />
+
+					</else>
+
+				</if>
+
+				<var name="p.finwait.@{p.host}" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="auditTCPKeepalive" description="Check TCP Keep Alive Interval"
+
+		depends="Init">
+
+		<echo />
+
+		<echo>CHECKING TCP KEEP ALIVE INTERVAL (rqd:
+			${zdeploy.required.tcp.keepalive})</echo>
+
+		<echo />
+
+		<for
+			list="${spec.env(dmgr)},${spec.env.fo.node(host)},${spec.env.is.node(host)}"
+
+			parallel="true" param="p.host">
+
+			<sequential>
+
+				<ssh-cmdp host="@{p.host}"
+					command="/usr/sbin/ndd -get /dev/tcp tcp_keepalive_interval"
+					outputproperty="p.keepalive.@{p.host}" />
+
+				<if>
+
+					<bool>
+
+						<equals arg1="${p.keepalive.@{p.host}}" arg2="${zdeploy.required.tcp.keepalive}"
+							trim="yes" />
+
+					</bool>
+
+					<then>
+
+						<echo>@{p.host}: value is OK</echo>
+
+					</then>
+
+					<else>
+
+						<echo level="warning"
+							message="@{p.host}: incorrect interval - ${p.keepalive.@{p.host}}" />
+
+						<property name="audit.net.failed" value="true" />
+
+					</else>
+
+				</if>
+
+				<var name="p.keepalive.@{p.host}" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="auditTCPConnreq" description="Check TCP Max Connection Requests"
+
+		depends="Init">
+
+		<echo />
+
+		<echo>CHECKING TCP MAX CONNECTION REQUESTS (rqd:
+			${zdeploy.required.tcp.connreq})</echo>
+
+		<echo />
+
+		<for
+			list="${spec.env(dmgr)},${spec.env.fo.node(host)},${spec.env.is.node(host)}"
+
+			parallel="true" param="p.host">
+
+			<sequential>
+
+				<ssh-cmdp host="@{p.host}"
+					command="/usr/sbin/ndd -get /dev/tcp tcp_conn_req_max_q"
+					outputproperty="p.connreq.@{p.host}" />
+
+				<if>
+
+					<bool>
+
+						<equals arg1="${p.connreq.@{p.host}}" arg2="${zdeploy.required.tcp.connreq}"
+							trim="yes" />
+
+					</bool>
+
+					<then>
+
+						<echo>@{p.host}: value is OK</echo>
+
+					</then>
+
+					<else>
+
+						<echo level="warning"
+							message="@{p.host}: incorrect limit - ${p.connreq.@{p.host}}" />
+
+						<property name="audit.net.failed" value="true" />
+
+					</else>
+
+				</if>
+
+				<var name="p.connreq.@{p.host}" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<!-- Auditing environment configuration -->
+
+	<target name="AuditEnv" description="Check environment requirements"
+
+		depends="Init,auditPathCP,auditUlimitFiles,auditUmask" />
+
+
+
+	<target name="auditPathCP" description="Check that the correct version of 'cp' is used"
+
+		depends="Init">
+
+		<echo />
+
+		<echo>CHECKING PATH FOR cp COMMAND</echo>
+
+		<echo />
+
+		<for
+			list="${spec.env(dmgr)},${spec.env.fo.node(host)},${spec.env.is.node(host)}"
+
+			parallel="true" param="p.host">
+
+			<sequential>
+
+				<ssh-cmdp host="@{p.host}" command="which cp"
+					outputproperty="p.cp_path.@{p.host}" />
+
+				<if>
+
+					<bool>
+
+						<or>
+
+							<equals arg1="${p.cp_path.@{p.host}}" arg2="/bin/cp" trim="true" />
+
+							<equals arg1="${p.cp_path.@{p.host}}" arg2="/usr/bin/cp"
+								trim="true" />
+
+						</or>
+
+					</bool>
+
+					<then>
+
+						<echo>@{p.host}: path is OK - ${p.cp_path.@{p.host}}</echo>
+
+					</then>
+
+					<else>
+
+						<echo level="warning">@{p.host}: invalid path - ${p.cp_path.@{p.host}}
+						</echo>
+
+						<property name="audit.env.failed" value="true" />
+
+					</else>
+
+				</if>
+
+				<var name="p.cp_path.@{p.host}" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="auditUlimitFiles" description="Check Maximum number of open files"
+
+		depends="Init">
+
+		<echo />
+
+		<echo>CHECKING MAX NUMBER OF OPEN FILES (min:
+			${zdeploy.required.ulimit.nofiles})</echo>
+
+		<echo />
+
+		<for
+			list="${spec.env(dmgr)},${spec.env.fo.node(host)},${spec.env.is.node(host)}"
+
+			parallel="true" param="p.host">
+
+			<sequential>
+
+				<ssh-cmdp host="@{p.host}"
+					command="/bin/sh -c 'ulimit -a' | grep nofiles | awk '{print $$2}'"
+					outputproperty="p.nofiles.@{p.host}" />
+
+				<if>
+
+					<bool>
+
+						<equals arg1="${p.nofiles.@{p.host}}" arg2="unlimited"
+							trim="true" />
+
+					</bool>
+
+					<then>
+
+						<echo>@{p.host}: value is OK - ${p.nofiles.@{p.host}}</echo>
+
+					</then>
+
+					<elseif>
+
+						<bool>
+
+							<islessthan arg1="${zdeploy.required.ulimit.nofiles}"
+								arg2="${p.nofiles.@{p.host}}" />
+
+						</bool>
+
+						<then>
+
+							<echo>@{p.host}: is OK - ${p.nofiles.@{p.host}}</echo>
+
+						</then>
+
+					</elseif>
+
+					<else>
+
+						<echo level="warning">@{p.host}: 'nofiles' too low -
+							${p.nofiles.@{p.host}}</echo>
+
+						<property name="audit.env.failed" value="true" />
+
+					</else>
+
+				</if>
+
+				<var name="p.nofiles.@{p.host}" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="auditUmask" description="Check umask setting"
+
+		depends="Init">
+
+		<echo />
+
+		<echo>CHECKING UMASK (rqd: ${zdeploy.required.umask})</echo>
+
+		<echo />
+
+		<for
+			list="${spec.env(dmgr)},${spec.env.fo.node(host)},${spec.env.is.node(host)}"
+
+			parallel="true" param="p.host">
+
+			<sequential>
+
+				<ssh-cmdp host="@{p.host}" command="/usr/bin/umask"
+					outputproperty="p.umask.@{p.host}" />
+
+				<if>
+
+					<bool>
+
+						<equals arg1="${p.umask.@{p.host}}" arg2="${zdeploy.required.umask}"
+							trim="true" />
+
+					</bool>
+
+					<then>
+
+						<echo>@{p.host}: umask is OK</echo>
+
+					</then>
+
+					<else>
+
+						<echo level="warning">@{p.host}: incorrect umask - ${p.umask.@{p.host}}
+						</echo>
+
+						<property name="audit.env.failed" value="true" />
+
+					</else>
+
+				</if>
+
+				<var name="p.umask.@{p.host}" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<!-- Auditing DNS configuration -->
+
+	<target name="AuditDNS" description="Check DNS requirements"
+
+		depends="Init,auditDNSWebhosts,auditDNS-FO,auditDNS-IS">
+
+		<!--echoproperties destfile="properties2.txt"/ -->
+
+	</target>
+
+	<target name="auditDNSWebhosts" description="Check webhost DNS aliases"
+
+		depends="Init">
+
+		<echo />
+
+		<echo>CHECKING DNS FOR WEBHOSTS</echo>
+
+		<echo />
+
+		<for list="${spec.env(webhosts)}" delimiter=", " parallel="false"
+
+			param="p.tuple">
+
+			<sequential>
+
+				<propertyregex property="p.alias.@{p.tuple}" input="@{p.tuple}"
+					regexp=" *([^(]+)" select="\1" />
+
+				<propertyregex property="p.host.@{p.tuple}" input="@{p.tuple}"
+					regexp=".*\(([^)]+)" select="\1" />
+
+				<cmphostalias host="${p.host.@{p.tuple}}" alias="${p.alias.@{p.tuple}}"
+					setonfailure="audit.dns.failed" />
+
+				<var name="p.alias.@{p.tuple}" unset="true" />
+
+				<var name="p.host.@{p.tuple}" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="auditDNS-FO" description="Check Front-office server DNS aliases"
+
+		depends="Init">
+
+		<echo />
+
+		<echo>CHECKING DNS FOR FRONT-OFFICE NODES</echo>
+
+		<echo />
+
+		<map2 target="auditDNS-pair" inheritall="true"
+
+			list1="${spec.env.fo.node(host)}" list2="${spec.env.fo.node(name)}" />
+
+		<var name="p.rslt" unset="true" />
+
+	</target>
+
+	<target name="auditDNS-IS" description="Check integration server DNS aliases"
+
+		depends="Init">
+
+		<echo />
+
+		<echo>CHECKING DNS FOR INTEGRATION SERVER NODES</echo>
+
+		<echo />
+
+		<map2 target="auditDNS-pair" inheritall="true"
+
+			list1="${spec.env.is.node(host)}" list2="${spec.env.is.node(name)}" />
+
+	</target>
+
+	<target name="auditDNS-pair" description="Check IP for host matches IP for alias"
+
+		depends="Init">
+
+		<cmphostalias host="${auditDNS-pair.p1}" alias="${auditDNS-pair.p2}"
+			setonfailure="audit.dns.failed" />
+
+	</target>
+
+	<!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ MAIN
+		TARGETS - DEPLOY +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+
+	<target name="deployInit">
+
+		<copy todir="temp" flatten="true">
+
+			<resources>
+
+				<url
+					url="http://unixdocs/applications/EOS/ENVIRONMENT-SUPPORT/R62WAS61/${env}.xml" />
+
+			</resources>
+
+		</copy>
+
+		<xmlproperty file="${tempdir}/${env}.xml"
+
+			semanticAttributes="true" includeSemanticAttribute="true" />
+
+		<property name="wasInstallHome" value="/mnt/WAS/was_61/disk1/WAS" />
+
+		<property name="updtInstallHome" value="/mnt/WAS/was_61/UpdateInstaller" />
+
+		<property name="fxpkHome" value="/mnt/WAS/fixpack/was_61" />
+
+		<property name="ihsInstallHome" value="/mnt/WAS/was_61/disk2/IHS" />
+
+	</target>
+
+	<target name="buildWAS"
+		depends="deployInit,mountSource,installBase,installIHS,installUpdt,installWasFixPaks,installIHSFixPaks,unmountSource,setupinitd,setupJspBatchCompiler,setupHttpConf,configureLogadmConf,configureJspBatchCompilerResponse,configureTivoliLogfileLinks">
+
+		<description>
+
+			Target Name: buildWAS
+
+			Description: This target builds all WebSphere components for an environment.
+
+		</description>
+
+		<echo />
+
+		<echo>WebSphere environment ${env} build completed.</echo>
+
+		<echo />
+
+	</target>
+
+	<target name="buildWASDev"
+		depends="deployInit,mountSource,installBase,installIHS,installUpdt,installWasFixPaks,installIHSFixPaks,unmountSource,setupJspBatchCompiler,setupHttpConf">
+
+		<description>
+
+			Target Name: buildWASDev
+
+			Description: This target builds all WebSphere components for a development
+			environment.
+
+		</description>
+
+		<echo />
+
+		<echo>WebSphere development environment ${env} build completed.</echo>
+
+		<echo />
+
+	</target>
+
+	<target name="configureWAS"
+		depends="deployInit,buildWAS,configureDmgr,configureNodes,configureWebs">
+
+		<description>
+
+			Target Name: configureWAS
+
+			Description: This target confiures all WebSphere components for an environment.
+
+		</description>
+
+		<echo />
+
+		<echo>WebSphere environment ${env} configure completed.</echo>
+
+		<echo />
+
+		<!-- configureGlobalSecurity hostname="${env.dmgr}" / -->
+
+	</target>
+
+	<!-- target name="configureWASDev" depends="deployInit,buildWASDev,configureDmgr,configureNodes,configureWebs" -->
+
+	<target name="configureWASDev"
+		depends="deployInit,buildWASDev,configureDmgr,configureNodes">
+
+		<description>
+
+			Target Name: configureWAS
+
+			Description: This target confiures all WebSphere components for an environment.
+
+		</description>
+
+		<echo />
+
+		<echo>WebSphere environment ${env} configure completed.</echo>
+
+		<echo />
+
+		<!-- configureGlobalSecurity hostname="${env.dmgr}" / -->
+
+	</target>
+
+	<!-- target name="removeWAS" depends="deployInit,deleteBase,deleteIHS,deleteUpdt" -->
+
+	<target name="removeWAS" depends="deployInit,deleteBase,deleteUpdt">
+
+		<description>
+
+			Target Name: removeWAS
+
+			Description: This target removes all WebSphere components for an environment.
+
+		</description>
+
+		<echo />
+
+		<echo>End Removing WebSphere.</echo>
+
+		<echo />
+
+	</target>
+
+	<!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ OTHER
+		TARGETS - DEPLOY +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+
+	<target name="buildDmgr" depends="deployInit">
+
+		<description>
+
+			Target Name: buildDmgr
+
+			Description: This is a stand alone target to build a Deployment manager only.
+
+			The hostname of the Deployemnt manager is determined by th valu of the
+			env.dmgr property, as recorded in the env.xml file.
+
+		</description>
+
+		<echo level="info">"Building deployment manager for environment
+			${env}..."</echo>
+
+		<installNode hostname="${env.dmgr}" />
+
+		<configureDmgr hostname="${env.dmgr}" />
+
+	</target>
+
+	<target name="buildNode" if="hostname" depends="deployInit">
+
+		<description>
+
+			Target Name: buildNode
+
+			Description: This is a stand alone target to build a single node.
+
+			The hostname of the node is determined by the value of the hostname
+			property, which must be supplied as an arguement of the script.
+
+			e.g. -Dhostname=nfrcellnode01
+
+		</description>
+
+		<echo level="info">"Building nodes for environment ${env}..."</echo>
+
+		<installNode hostname="${hostname}" />
+
+		<configureNode hostname="${hostname}" />
+
+	</target>
+
+	<target name="buildWeb" if="hostname" depends="deployInit">
+
+		<description>
+
+			Target Name: buildWeb
+
+			Description: This is a stand alone target to build a single we server.
+
+			The hostname of the node is determined by the value of the hostname
+			property, which must be supplied as an arguement of the script.
+
+			e.g. -Dhostname=nfrcellweb01
+
+		</description>
+
+		<echo level="info">"Building web server @{hostname}..."</echo>
+
+		<installWeb hostname="${hostname}" />
+
+		<configureWebProfile hostname="${hostname}" />
+
+	</target>
+
+	<target name="testStuff" if="hostname" depends="deployInit">
+
+		<runsshexec hostname="${hostname}"
+
+			command="${env.profilehome}/${env.nodeprofile}/bin/serverStatus.sh nodeagent | grep stopped"
+
+			outputproperty="stopNodeProcessRoot.@{hostname}.check" />
+
+	</target>
+
+	<target name="deployJspBatchCompilerResponse">
+
+		<description>
+
+			Called as target by map2pair macro from setupJspBatchCompilerResponse
+
+		</description>
+
+		<propertyregex property="deployJspBatchCompilerResponse.srv1"
+			input="${deployJspBatchCompilerResponse.p2}" regexp="([^,]+)" select="\1" />
+
+		<propertyregex property="deployJspBatchCompilerResponse.srv2"
+			input="${deployJspBatchCompilerResponse.p2}" regexp="[^,]+,(.+)"
+			select="\1" />
+
+		<mkdir dir="${tempdir}/${deployJspBatchCompilerResponse.p1}" />
+
+		<echo>Creating custom 'jspbatchcompiler_response' file for host
+			${deployJspBatchCompilerResponse.p1} server
+			${deployJspBatchCompilerResponse.srv1}...</echo>
+
+		<copy file="templates/jspbatchcompiler_response"
+
+			tofile="${tempdir}/${deployJspBatchCompilerResponse.p1}/jspbatchcompiler_response.${deployJspBatchCompilerResponse.srv1}">
+
+			<filterset>
+
+				<filter token="NODE" value="${deployJspBatchCompilerResponse.p1}" />
+
+				<filter token="SRV" value="${deployJspBatchCompilerResponse.srv1}" />
+
+				<filter token="WAS_HOME" value="${env.washome}" />
+
+			</filterset>
+
+		</copy>
+
+		<echo>Creating custom 'jspbatchcompiler_response' file for host
+			${deployJspBatchCompilerResponse.p1} server
+			${deployJspBatchCompilerResponse.srv2}...</echo>
+
+		<copy file="templates/jspbatchcompiler_response"
+
+			tofile="${tempdir}/${deployJspBatchCompilerResponse.p1}/jspbatchcompiler_response.${deployJspBatchCompilerResponse.srv2}">
+
+			<filterset>
+
+				<filter token="NODE" value="${deployJspBatchCompilerResponse.p1}" />
+
+				<filter token="SRV" value="${deployJspBatchCompilerResponse.srv2}" />
+
+				<filter token="WAS_HOME" value="${env.washome}" />
+
+			</filterset>
+
+		</copy>
+
+		<echo>Installing custom 'jspbatchcompiler_response' files on host
+			${deployJspBatchCompilerResponse.p1}...</echo>
+
+		<scp keyfile="${ssh.keyfile}" passphrase="" trust="true"
+
+			remoteTodir="root@${deployJspBatchCompilerResponse.p1}:/${env.washome}/bin"
+
+			verbose="true">
+
+			<fileset file="${tempdir}/${deployJspBatchCompilerResponse.p1}/*" />
+
+		</scp>
+
+		<runsshexec hostname="${deployJspBatchCompilerResponse.p1}"
+
+			command='dos2unix ${env.washome}/bin/jspbatchcompiler_response.${deployJspBatchCompilerResponse.srv1} ${env.washome}/bin/jspbatchcompiler_response.${deployJspBatchCompilerResponse.srv1}'
+
+			outputproperty="deployJspBatchCompilerResponse.${deployJspBatchCompilerResponse.p1}.dos2unix" />
+
+		<if>
+
+			<bool>
+
+				<isset
+					property="deployJspBatchCompilerResponse.${deployJspBatchCompilerResponse.p1}.dos2unix" />
+
+			</bool>
+
+			<else>
+
+				<echo level="error">Converting
+					'jspbatchcompiler_response.${deployJspBatchCompilerResponse.srv1}'
+					from dos to unix format on host @{hostname} failed. The
+					'jspbatchcompiler_response.${deployJspBatchCompilerResponse.srv1}'
+					file will now be corrupt and you will have to run dos2unix on it
+					manually.</echo>
+
+				<fail
+					message="Converting jspbatchcompiler_response.${deployJspBatchCompilerResponse.srv1}' from dos to unix format on host @{hostname} failed." />
+
+			</else>
+
+		</if>
+
+		<runsshexec hostname="${deployJspBatchCompilerResponse.p1}"
+
+			command='dos2unix ${env.washome}/bin/jspbatchcompiler_response.${deployJspBatchCompilerResponse.srv2} ${env.washome}/bin/jspbatchcompiler_response.${deployJspBatchCompilerResponse.srv2}'
+
+			outputproperty="deployJspBatchCompilerResponse.${deployJspBatchCompilerResponse.p1}.dos2unix" />
+
+		<if>
+
+			<bool>
+
+				<isset
+					property="deployJspBatchCompilerResponse.${deployJspBatchCompilerResponse.p1}.dos2unix" />
+
+			</bool>
+
+			<else>
+
+				<echo level="error">Converting
+					'jspbatchcompiler_response.${deployJspBatchCompilerResponse.srv2}'
+					from dos to unix format on host @{hostname} failed. The
+					'jspbatchcompiler_response.${deployJspBatchCompilerResponse.srv2}'
+					file will now be corrupt and you will have to run dos2unix on it
+					manually.</echo>
+
+				<fail
+					message="Converting jspbatchcompiler_response.${deployJspBatchCompilerResponse.srv2}' from dos to unix format on host @{hostname} failed." />
+
+			</else>
+
+		</if>
+
+		<var name="deployJspBatchCompilerResponse.srv1" unset="true" />
+
+		<var name="deployJspBatchCompilerResponse.srv2" unset="true" />
+
+		<var
+			name="deployJspBatchCompilerResponse.${deployJspBatchCompilerResponse.p1}.dos2unix"
+			unset="true" />
+
+	</target>
+
+	<target name="deployTivoliLogfileLinks" depends="Init,deployInit">
+
+		<description>
+
+			Called as target by map2pair macro from setupJspBatchCompilerResponse
+
+		</description>
+
+		<propertyregex property="deployTivoliLogfileLinks.srv1"
+			input="${deployTivoliLogfileLinks.p2}" regexp="([^,]+)" select="\1" />
+
+		<propertyregex property="deployTivoliLogfileLinks.srv2"
+			input="${deployTivoliLogfileLinks.p2}" regexp="[^,]+,(.+)" select="\1" />
+
+		<echo>Removing existing TECAD links on host
+			${deployTivoliLogfileLinks.p1}...</echo>
+
+		<runsshexec hostname="${deployTivoliLogfileLinks.p1}"
+
+			command='rm -f /opt/Tivoli/tecad/logfiles/jvm*' outputproperty="deployTivoliLogfileLinks.${deployTivoliLogfileLinks.p1}.rm" />
+
+		<if>
+
+			<bool>
+
+				<isset property="deployTivoliLogfileLinks.${deployTivoliLogfileLinks.p1}.rm" />
+
+			</bool>
+
+			<else>
+
+				<echo level="error">Removal of /opt/Tivoli/tecad/logfiles/jvm* on host
+					@{hostname} failed.</echo>
+
+				<fail
+					message="Removal of /opt/Tivoli/tecad/logfiles/jvm* on host @{hostname} failed." />
+
+			</else>
+
+		</if>
+
+		<var name="deployTivoliLogfileLinks.${deployTivoliLogfileLinks.p1}.rm"
+			unset="true" />
+
+		<echo>Creating ${deployTivoliLogfileLinks.srv1} link as jvm1 on host
+			${deployTivoliLogfileLinks.p1}...</echo>
+
+		<configureTivoliLink hostname="${deployTivoliLogfileLinks.p1}"
+
+			source="${env.profilehome}/node/logs/${deployTivoliLogfileLinks.srv1}"
+
+			target="/opt/Tivoli/tecad/logfiles/jvm1" />
+
+		<echo>Creating ${deployTivoliLogfileLinks.srv2} link as jvm2 on host
+			${deployTivoliLogfileLinks.p1}...</echo>
+
+		<configureTivoliLink hostname="${deployTivoliLogfileLinks.p1}"
+
+			source="${env.profilehome}/node/logs/${deployTivoliLogfileLinks.srv1}"
+
+			target="/opt/Tivoli/tecad/logfiles/jvm2" />
+
+		<echo>Creating nodeagent link as jvm3 on host
+			${deployTivoliLogfileLinks.p1}...</echo>
+
+		<configureTivoliLink hostname="${deployTivoliLogfileLinks.p1}"
+
+			source="${env.profilehome}/node/logs/nodeagent" target="/opt/Tivoli/tecad/logfiles/jvm3" />
+
+		<var name="deployTivoliLogfileLinks.srv1" unset="true" />
+
+		<var name="deployTivoliLogfileLinks.srv2" unset="true" />
+
+	</target>
+
+	<!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ INSTALLATION
+		TARGETS ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+
+	<target name="mountSource" depends="deployInit">
+
+		<for list="${env.webnodes},${env.dmgr},${env.appsrvnodes}" param="hostname"
+			parallel="true" keepgoing="true">
+
+			<sequential>
+
+				<echo>Checking to see if the mount point is already mounted
+					correctly on host @{hostname}...</echo>
+
+				<runsshexec hostname="@{hostname}" command="df -h | grep hermes:/opt/install"
+
+					outputproperty="mountsource.@{hostname}.check" />
+
+				<if>
+
+					<bool>
+
+						<isset property="mountsource.@{hostname}.check" />
+
+					</bool>
+
+					<then>
+
+						<echo level="warning">Souce mount already mounted correctly on host
+							@{hostname}...</echo>
+
+					</then>
+
+					<else>
+
+						<echo>Mounting source on host @{hostname}...</echo>
+
+						<runsshexec hostname="@{hostname}"
+							command="/usr/sbin/mount hermes:/opt/install /mnt"
+							outputproperty="mountsource.@{hostname}.mount" />
+
+						<if>
+
+							<bool>
+
+								<isset property="mountsource.@{hostname}.mount" />
+
+							</bool>
+
+							<else>
+
+								<echo level="error"
+									message="Source mount failed on host @{hostname}. Verify that the /mnt mount point is not being used and try again." />
+
+								<fail
+									message="Source mount failed on host @{hostname}. Verify that the /mnt mount point is not being used and try again." />
+
+							</else>
+
+						</if>
+
+						<var name="mountsource.@{hostname}.mount" unset="true" />
+
+					</else>
+
+				</if>
+
+				<var name="mountsource.@{hostname}.check" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="installBase" depends="deployInit">
+
+		<for list="${env.dmgr},${env.appsrvnodes}" param="hostname"
+			parallel="true" keepgoing="true">
+
+			<sequential>
+
+				<echo>Searching for an existing WebSphere installation on host
+					@{hostname}...</echo>
+
+				<runsshexec hostname="@{hostname}" command='${env.washome}/bin/versionInfo.sh'
+
+					outputproperty="installbase.@{hostname}.check" />
+
+				<if>
+
+					<bool>
+
+						<isset property="installbase.@{hostname}.check" />
+
+					</bool>
+
+					<then>
+
+						<echo level="warning">WebSphere already installed on @{hostname}...
+						</echo>
+
+					</then>
+
+					<else>
+
+						<echo>Installing base product on host @{hostname}...</echo>
+
+						<runsshexec hostname="@{hostname}"
+
+							command="${wasInstallHome}/install
+
+-OPT feature=noFeature
+
+-OPT silentInstallLicenseAcceptance=true
+
+-OPT installLocation=${env.washome}
+
+-OPT installType=installNew
+
+-OPT profileType=none -silent"
+
+							outputproperty="installbase.@{hostname}.install" />
+
+						<if>
+
+							<bool>
+
+								<isset property="installbase.@{hostname}.install" />
+
+							</bool>
+
+							<else>
+
+								<echo level="error">Base WebSphere installation failed on
+									@{hostname}. See log file entries below for the root cause.
+								</echo>
+
+								<checkLogFile hostname="@{hostname}"
+									command="cat ${env.washome}/logs/install/log.txt" />
+
+								<fail
+									message="Base WebSphere installation failed on @{hostname}. See log file entries above for the root cause." />
+
+							</else>
+
+						</if>
+
+						<var name="installbase.@{hostname}.install" unset="true" />
+
+					</else>
+
+				</if>
+
+				<var name="installbase.@{hostname}.check" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="installUpdt" depends="deployInit">
+
+		<for list="${env.webnodes},${env.dmgr},${env.appsrvnodes}" param="hostname"
+			parallel="true" keepgoing="true">
+
+			<sequential>
+
+				<echo>Searching for an existing WebSphere UpdateInstaller
+					installation on host @{hostname}...</echo>
+
+				<runsshexec hostname="@{hostname}"
+
+					command='cat ${env.updtinstaller}/version.txt | grep ${env.updaterversion}'
+
+					outputproperty="installUpdate.@{hostname}.check" />
+
+				<if>
+
+					<bool>
+
+						<isset property="installUpdate.@{hostname}.check" />
+
+					</bool>
+
+					<then>
+
+						<echo level="warning">Update installer ${env.updaterversion} already
+							installed on host @{hostname}</echo>
+
+					</then>
+
+					<else>
+
+						<echo>Installing UpdateInstaller on host @{hostname}...</echo>
+
+						<runsshexec hostname="@{hostname}"
+
+							command="${updtInstallHome}/install
+
+-OPT installLocation=${env.updtinstaller}
+
+-OPT silentInstallLicenseAcceptance=true
+
+-silent"
+
+							outputproperty="installUpdt.@{hostname}" />
+
+						<if>
+
+							<bool>
+
+								<isset property="installUpdt.@{hostname}" />
+
+							</bool>
+
+							<else>
+
+								<echo level="error">WebSphere UpdateInstaller installation failed
+									on @{hostname}. See log file entries below for the root cause.
+								</echo>
+
+								<checkLogFile hostname="@{hostname}"
+									command="cat ${env.updtinstaller}/logs/install/log.txt" />
+
+								<fail
+									message="WebSphere UpdateInstaller installation failed on @{hostname}.
+
+See log file entries above for the root cause." />
+
+							</else>
+
+						</if>
+
+						<var name="installUpdt.@{hostname}" unset="true" />
+
+					</else>
+
+				</if>
+
+				<var name="installUpdate.@{hostname}.check" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="installWasFixPaks" depends="deployInit">
+
+		<for list="${env.dmgr},${env.appsrvnodes}" param="hostname"
+			parallel="true" keepgoing="true">
+
+			<sequential>
+
+				<echo>Checking existing WebSphere release on host @{hostname}...
+				</echo>
+
+				<runsshexec hostname="@{hostname}"
+
+					command='${env.washome}/bin/versionInfo.sh | grep ${env.wasversion}'
+
+					outputproperty="installWasFixpaks.@{hostname}.check" />
+
+				<if>
+
+					<bool>
+
+						<isset property="installWasFixpaks.@{hostname}.check" />
+
+					</bool>
+
+					<then>
+
+						<echo level="warning">WebSphere fixpack ${env.wasversion} already
+							installed on host @{hostname}...</echo>
+
+					</then>
+
+					<else>
+
+						<echo>Copying the WebSphere fixpaks to host @{hostname}...</echo>
+
+						<runsshexec hostname="@{hostname}"
+
+							command="cp ${fxpkHome}/was/*.pak ${env.updtinstaller}/maintenance;
+
+cp ${fxpkHome}/sdk/*.pak ${env.updtinstaller}/maintenance"
+
+							outputproperty="installWasFixpaks.@{hostname}.copy" />
+
+						<if>
+
+							<bool>
+
+								<isset property="installWasFixpaks.@{hostname}.copy" />
+
+							</bool>
+
+							<then>
+
+								<echo>Installing WebSphere fixpaks on host @{hostname}...</echo>
+
+								<runsshexec hostname="@{hostname}"
+
+									command="${env.updtinstaller}/update.sh -W product.location=${env.washome} -silent"
+
+									outputproperty="installWasFixpaks.@{hostname}.install" />
+
+								<if>
+
+									<bool>
+
+										<isset property="installWasFixpaks.@{hostname}.install" />
+
+									</bool>
+
+									<else>
+
+										<echo level="error">WebSphere Fixpack installation failed on
+											@{hostname}. See log file entries below for the root cause.
+										</echo>
+
+										<checkLogFile hostname="@{hostname}"
+											command="cat ${env.washome}/logs/update/install/updatelog.txt" />
+
+										<fail
+											message="WebSphere Fixpack installation failed on @{hostname}. See log file entries above for the root cause." />
+
+									</else>
+
+								</if>
+
+								<var name="installWasFixpaks.@{hostname}.install" unset="true" />
+
+							</then>
+
+							<else>
+
+								<echo level="error">WebSphere Fixpack file copy failed on
+									@{hostname}.</echo>
+
+								<fail
+									message="WebSphere Fixpack file copy failed on @{hostname}. Try copying the fixpack files manually and then see what the problem is." />
+
+							</else>
+
+						</if>
+
+						<var name="installWasFixpaks.@{hostname}.copy" unset="true" />
+
+					</else>
+
+				</if>
+
+				<var name="installWasFixpaks.@{hostname}.check" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="setupinitd" depends="deployInit">
+
+		<for list="${env.dmgr},${env.appsrvnodes}" param="hostname"
+			parallel="true" keepgoing="true">
+
+			<sequential>
+
+				<echo>Setting up the /etc/init.d script files on host @{hostname}...
+				</echo>
+
+				<runsshexec hostname="@{hostname}"
+
+					command='rm /etc/init.d/was-allservers;rm /etc/rc0.d/K*was-allservers;rm /etc/rc1.d/K*was-allservers;rm /etc/rc3.d/S*was-allservers'
+
+					outputproperty="setupinitd.@{hostname}.delete" />
+
+				<if>
+
+					<bool>
+
+						<isset property="setupinitd.@{hostname}.delete" />
+
+					</bool>
+
+					<then>
+
+						<runscp hostname="@{hostname}" file="templates/was-allservers"
+							remoteTofile="/etc/init.d/was-allservers" />
+
+						<runsshexec hostname="@{hostname}"
+
+							command='chmod 755 /etc/init.d/was-allservers' outputproperty="setupinitd.@{hostname}.changeperms" />
+
+						<if>
+
+							<bool>
+
+								<isset property="setupinitd.@{hostname}.changeperms" />
+
+							</bool>
+
+							<then>
+
+								<runsshexec hostname="@{hostname}"
+
+									command='ln -s /etc/init.d/was-allservers /etc/rc0.d/K02was-allservers;ln -s /etc/init.d/was-allservers /etc/rc1.d/K02was-allservers;ln -s /etc/init.d/was-allservers /etc/rc3.d/S99was-allservers'
+
+									outputproperty="setupinitd.@{hostname}.link" />
+
+								<if>
+
+									<bool>
+
+										<isset property="setupinitd.@{hostname}.link" />
+
+									</bool>
+
+									<else>
+
+										<echo level="error">Could not set up softlinks for file
+											/etc/init.d/was-allservers on host @{hostname}. You will have
+											to do this manually.</echo>
+
+									</else>
+
+								</if>
+
+							</then>
+
+							<else>
+
+								<echo level="error">Could not change permissions for file
+									/etc/init.d/was-allservers on host @{hostname}. You will have
+									to do this manually.</echo>
+
+							</else>
+
+						</if>
+
+					</then>
+
+					<else>
+
+						<echo level="error">Could not remove the softlinks for
+							/etc/init,.d/was-allservers on host @{hostname}. You will have to
+							do this manually.</echo>
+
+					</else>
+
+				</if>
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="configureJspBatchCompilerResponse" depends="deployInit">
+
+		<for list="${env.appsrvnodes}" param="hostname" parallel="false"
+			keepgoing="true">
+
+			<sequential>
+
+				<map2pair target="deployJspBatchCompilerResponse"
+
+					inheritall="true" list1="${env.fo.node.name}" list2="${env.fo.node.server.name}"
+
+					only="@{hostname}" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="setupJspBatchCompiler" depends="deployInit">
+
+		<for list="${env.appsrvnodes}" param="hostname" parallel="true"
+			keepgoing="true">
+
+			<sequential>
+
+				<runscp hostname="@{hostname}" file="templates/JspBatchCompiler.sh"
+					remoteTofile="${env.washome}/bin/JspBatchCompiler.sh" />
+
+				<runsshexec hostname="@{hostname}"
+
+					command='dos2unix ${env.washome}/bin/JspBatchCompiler.sh ${env.washome}/bin/JspBatchCompiler.sh'
+
+					outputproperty="setupJspBatchCompiler.@{hostname}.convert" />
+
+				<if>
+
+					<bool>
+
+						<isset property="setupJspBatchCompiler.@{hostname}.convert" />
+
+					</bool>
+
+					<then>
+
+						<runsshexec hostname="@{hostname}"
+
+							command='chmod 755 ${env.washome}/bin/JspBatchCompiler.sh'
+
+							outputproperty="setupJspBatchCompiler.@{hostname}.perm" />
+
+						<if>
+
+							<bool>
+
+								<isset property="setupJspBatchCompiler.@{hostname}.perm" />
+
+							</bool>
+
+							<then>
+
+								<copy file="templates/jspcompiler.sh" todir="${tempdir}/@{hostname}/">
+
+									<filterset>
+
+										<filter token="WAS_HOME" value="${env.washome}" />
+
+									</filterset>
+
+								</copy>
+
+								<runscp hostname="@{hostname}" file="${tempdir}/@{hostname}/jspcompiler.sh"
+									remoteTofile="${bin.home}/jspcompiler.sh" />
+
+								<runsshexec hostname="@{hostname}"
+
+									command='dos2unix ${bin.home}/jspcompiler.sh ${bin.home}/jspcompiler.sh'
+
+									outputproperty="setupjspcompiler.@{hostname}.convert" />
+
+								<if>
+
+									<bool>
+
+										<isset property="setupjspcompiler.@{hostname}.convert" />
+
+									</bool>
+
+									<then>
+
+										<runsshexec hostname="@{hostname}"
+
+											command='chmod 755 ${bin.home}/jspcompiler.sh'
+
+											outputproperty="setupjspcompiler.@{hostname}.perm" />
+
+										<if>
+
+											<bool>
+
+												<isset property="setupjspcompiler.@{hostname}.perm" />
+
+											</bool>
+
+											<else>
+
+												<echo level="error">Changing permissions on jspcompiler.sh
+													failed. You will have to change them manually.</echo>
+
+												<fail
+													message="Changing permissions on jspcompiler.sh failed. You will have to change them manually." />
+
+											</else>
+
+										</if>
+
+									</then>
+
+									<else>
+
+										<echo level="error">Converting jspcompiler.sh from dos to unix
+											format on host @{hostname} failed. The jspcompiler.sh file
+											will now be corrupt and you will have to run dos2unix on it
+											manually.</echo>
+
+										<fail
+											message="Converting jspcompiler.sh from dos to unix format on host @{hostname} failed." />
+
+									</else>
+
+								</if>
+
+							</then>
+
+							<else>
+
+								<echo level="error">Changing permissions on JspBatchCompiler.sh
+									failed. You will have to change them manually.</echo>
+
+								<fail
+									message="Changing permissions on JspBatchCompiler.sh failed. You will have to change them manually." />
+
+							</else>
+
+						</if>
+
+					</then>
+
+					<else>
+
+						<echo level="error">Converting JspBatchCompiler.sh from dos to unix
+							format on host @{hostname} failed. The JspBatchCompiler.sh file
+							will now be corrupt and you will have to run dos2unix on it
+							manually.</echo>
+
+						<fail
+							message="Converting JspBatchCompiler.sh from dos to unix format on host @{hostname} failed." />
+
+					</else>
+
+				</if>
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="configureLogadmConf" depends="deployInit">
+
+		<for list="${env.webnodes},${env.dmgr},${env.appsrvnodes}" param="hostname"
+			parallel="true" keepgoing="true">
+
+			<sequential>
+
+				<property name="configureLogadmConf.@{hostname}.tgt" value="/home/local/bin/was6_logadm.conf" />
+
+				<mkdir dir="${tempdir}/@{hostname}" />
+
+				<echo>Creating custom 'was6_logadm.conf' for host @{hostname}...
+				</echo>
+
+				<copy file="templates/was6_logadm.conf" todir="${tempdir}/@{hostname}/">
+
+					<filterset>
+
+						<filter token="WAS_HOME" value="${env.washome}" />
+
+						<filter token="IHS_HOME" value="${env.ihshome}" />
+
+					</filterset>
+
+				</copy>
+
+				<echo>Installing custom 'was6_logadm.conf' on host @{hostname}...
+				</echo>
+
+				<runscp hostname="@{hostname}" file="${tempdir}/@{hostname}/was6_logadm.conf"
+					remotetofile="${configureLogadmConf.@{hostname}.tgt}" />
+
+				<runsshexec hostname="@{hostname}"
+
+					command='dos2unix ${configureLogadmConf.@{hostname}.tgt} ${configureLogadmConf.@{hostname}.tgt}'
+
+					outputproperty="configureLogadmConf.@{hostname}.dos2unix" />
+
+				<if>
+
+					<bool>
+
+						<isset property="configureLogadmConf.@{hostname}.dos2unix" />
+
+					</bool>
+
+					<else>
+
+						<echo level="error">Converting 'was6_logadm.conf' from dos to unix
+							format on host @{hostname} failed. The 'was6_logadm.conf' file
+							will now be corrupt and you will have to run dos2unix on it
+							manually.</echo>
+
+						<fail
+							message="Converting 'was6_logadm.conf' from dos to unix format on host @{hostname} failed." />
+
+					</else>
+
+				</if>
+
+				<var name="configureLogadmConf.@{hostname}.dos2unix" unset="true" />
+
+				<var name="configureLogadmConf.@{hostname}.tgt" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="installIHS" depends="deployInit">
+
+		<for list="${env.webnodes}" param="hostname" parallel="true"
+			keepgoing="true">
+
+			<sequential>
+
+				<runsshexec hostname="@{hostname}" command='${env.ihshome}/bin/versionInfo.sh'
+
+					outputproperty="installIHS.@{hostname}.check" />
+
+				<if>
+
+					<bool>
+
+						<isset property="installIHS.@{hostname}.check" />
+
+					</bool>
+
+					<then>
+
+						<echo>IHS already installed on @{hostname}...</echo>
+
+					</then>
+
+					<else>
+
+						<echo>Installing IHS ${env.ihsversion} product on host
+							@{hostname}...</echo>
+
+						<echo>DBG: Install script: ${ihsInstallHome}/install ...</echo>
+
+						<runsshexec hostname="@{hostname}"
+
+							command="${ihsInstallHome}/install
+
+-OPT installGSKit=true
+
+-OPT silentInstallLicenseAcceptance=true
+
+-OPT installLocation=${env.ihshome}
+
+-OPT httpPort=80
+
+-OPT adminPort=88
+
+-OPT createAdminAuth=true
+
+-OPT adminAuthUser=admin
+
+-OPT adminAuthPassword=password
+
+-OPT adminAuthPasswordConfirm=password
+
+-OPT installPlugin=true
+
+-OPT webserverDefinition=@{hostname}
+
+-OPT washostname=@{hostname}
+
+-OPT runSetupAdmin=true
+
+-OPT createAdminUserGroup=true
+
+-OPT setupAdminUser=${env.procuser}
+
+-OPT setupAdminGroup=wasgroup
+
+-silent"
+
+							outputproperty="installIHS.@{hostname}.install" />
+
+						<if>
+
+							<bool>
+
+								<isset property="installIHS.@{hostname}.install" />
+
+							</bool>
+
+							<then>
+
+								<!-- configureLogadmConf hostname="@{hostname}" basedir="${env.ihshome}"/ -->
+
+							</then>
+
+							<else>
+
+								<echo level="error">IHS installation failed on @{hostname}. See log
+									file entries below for the root cause.</echo>
+
+								<checkLogFile hostname="@{hostname}"
+									command="cat ${env.ihshome}/logs/install/log.txt" />
+
+								<fail
+									message="IHS installation failed on @{hostname}. See log file entries above for the root cause." />
+
+							</else>
+
+						</if>
+
+						<var name="installIHS.@{hostname}.install" unset="true" />
+
+					</else>
+
+				</if>
+
+				<var name="installIHS.@{hostname}.check" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="setupHttpConf" depends="deployInit">
+
+		<for list="${env.webnodes}" param="hostname" parallel="true"
+			keepgoing="true">
+
+			<sequential>
+
+				<echo level="info">Setting up the http.conf file on host
+					@{hostname}...</echo>
+
+				<copy file="templates/61_httpd.conf" todir="${tempdir}/@{hostname}"
+					overwrite="true" />
+
+				<copy file="templates/temp.properties" todir="${tempdir}/@{hostname}"
+					overwrite="true" />
+
+				<propertyfile file="${tempdir}/@{hostname}/temp.properties">
+
+					<entry key="@webServerName@" value="@{hostname}" />
+
+					<entry key="@ihsUser@" value="${env.procuser}" />
+
+					<entry key="@webServerHome@" value="${env.ihshome}" />
+
+				</propertyfile>
+
+				<replace file="${tempdir}/@{hostname}/61_httpd.conf"
+					summary="yes" replacefilterfile="${tempdir}/@{hostname}/temp.properties" />
+
+				<echo level="info">Copying the http.conf file to host @{hostname}...
+				</echo>
+
+				<runscp hostname="@{hostname}" file="${tempdir}/@{hostname}/61_httpd.conf"
+					remoteTofile="${env.ihshome}/conf/httpd.conf" />
+
+				<echo level="info">Converting httpd.conf from dos to unix format on
+					host @{hostname}...</echo>
+
+				<runsshexec hostname="@{hostname}"
+
+					command='dos2unix ${env.ihshome}/conf/httpd.conf ${env.ihshome}/conf/httpd.conf'
+
+					outputproperty="setupHttpConf.@{hostname}.convert" />
+
+				<if>
+
+					<bool>
+
+						<isset property="setupHttpConf.@{hostname}.convert" />
+
+					</bool>
+
+					<else>
+
+						<echo level="error">Converting httpd.conf file from dos to unix
+							format on host @{hostname} failed. The httpd.conf file will now
+							be corrupt and you will have to run dos2unix on it manually.
+						</echo>
+
+						<fail
+							message="Converting httpd.conf file from dos to unix format on host @{hostname} failed." />
+
+					</else>
+
+				</if>
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="installIHSFixPaks" depends="deployInit">
+
+		<for list="${env.webnodes}" param="hostname" parallel="true"
+			keepgoing="true">
+
+			<sequential>
+
+				<runsshexec hostname="@{hostname}"
+
+					command='${env.ihshome}/bin/versionInfo.sh | grep ${env.ihsversion}'
+
+					outputproperty="installIHSFixpaks.@{hostname}.check" />
+
+				<if>
+
+					<bool>
+
+						<isset property="installIHSFixpaks.@{hostname}.check" />
+
+					</bool>
+
+					<then>
+
+						<echo>IHS fixpack ${env.ihsversion} already installed on host
+							@{hostname}...</echo>
+
+					</then>
+
+					<else>
+
+						<echo level="info">Copying the IHS fixpaks to host @{hostname}...
+						</echo>
+
+						<runsshexec hostname="@{hostname}"
+
+							command="cp ${fxpkHome}/ihs/*.pak ${env.updtinstaller}/maintenance;cp ${fxpkHome}/sdk/*.pak ${env.updtinstaller}/maintenance"
+
+							outputproperty="installIHSFixpaks.@{hostname}.copy" />
+
+						<if>
+
+							<bool>
+
+								<isset property="installIHSFixpaks.@{hostname}.copy" />
+
+							</bool>
+
+							<then>
+
+								<echo>Installing IHS fixpaks on host @{hostname}...</echo>
+
+								<runsshexec hostname="@{hostname}"
+
+									command="${env.updtinstaller}/update.sh -W product.location=${env.ihshome} -silent;${env.updtinstaller}/update.sh -W product.location=${env.ihshome}/Plugins -silent"
+
+									outputproperty="installIHSFixpaks.@{hostname}.install" />
+
+								<if>
+
+									<bool>
+
+										<isset property="installIHSFixpaks.@{hostname}.install" />
+
+									</bool>
+
+									<else>
+
+										<echo level="error">IHS Fixpack installation failed on
+											@{hostname}. See log file entries below for the root cause.
+										</echo>
+
+										<checkLogFile hostname="@{hostname}"
+											command="cat ${env.ihshome}/logs/update/install/updatelog.txt" />
+
+										<fail
+											message="IHS Fixpack installation failed on @{hostname}. See log file entries above for the root cause." />
+
+									</else>
+
+								</if>
+
+								<var name="installIHSFixpaks.@{hostname}.install" unset="true" />
+
+							</then>
+
+							<else>
+
+								<echo level="error">IHS Fixpack file copy failed on @{hostname}.
+								</echo>
+
+								<fail
+									message="IHS Fixpack file copy failed on @{hostname}. Try copying the fixpack files manually and then see what the problem is." />
+
+							</else>
+
+						</if>
+
+						<var name="installIHSFixpaks.@{hostname}.copy" unset="true" />
+
+					</else>
+
+				</if>
+
+				<var name="installIHSFixpaks.@{hostname}.check" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="unmountSource" depends="deployInit">
+
+		<for list="${env.webnodes},${env.dmgr},${env.appsrvnodes}" param="hostname"
+			parallel="true" keepgoing="true">
+
+			<sequential>
+
+				<echo>Unmounting source on host @{hostname}...</echo>
+
+				<runsshexec hostname="@{hostname}" command="/usr/sbin/umount -f /mnt"
+					outputproperty="unmountsource.@{hostname}" />
+
+				<if>
+
+					<bool>
+
+						<isset property="unmountsource.@{hostname}" />
+
+					</bool>
+
+					<else>
+
+						<echo level="error"
+							message="Source unmount failed on host @{hostname}. You will have to unmount the /mnt mount point manually." />
+
+					</else>
+
+				</if>
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="configureTivoliLogfileLinks" depends="deployInit">
+
+		<for list="${env.dmgr},${env.appsrvnodes}" param="hostname"
+			parallel="false" keepgoing="true">
+
+			<sequential>
+
+				<runsshexec hostname="@{hostname}" command='ls /opt/Tivoli/tecad/logfiles/'
+
+					outputproperty="configureTivoliLogfileLinks.@{hostname}.ls" />
+
+				<if>
+
+					<bool>
+
+						<isset property="configureTivoliLogfileLinks.@{hostname}.ls" />
+
+					</bool>
+
+					<then>
+
+						<var name="configureTivoliLogfileLinks.@{hostname}.ls" unset="true" />
+
+						<if>
+
+							<bool>
+
+								<equals arg1="@{hostname}" arg2="${env.dmgr}" trim="yes" />
+
+							</bool>
+
+							<then>
+
+								<echo>Removing existing TECAD links on host @{hostname}...
+								</echo>
+
+								<runsshexec hostname="@{hostname}"
+
+									command='rm -f /opt/Tivoli/tecad/logfiles/jvm*' outputproperty="configureTivoliLogfileLinks.@{hostname}.rm" />
+
+								<if>
+
+									<bool>
+
+										<isset property="configureTivoliLogfileLinks.@{hostname}.rm" />
+
+									</bool>
+
+									<else>
+
+										<echo level="error">Removal of /opt/Tivoli/tecad/logfiles/jvm* on
+											host @{hostname} failed.</echo>
+
+										<fail
+											message="Removal of /opt/Tivoli/tecad/logfiles/jvm* on host @{hostname} failed." />
+
+									</else>
+
+								</if>
+
+								<var name="configureTivoliLogfileLinks.@{hostname}.rm"
+									unset="true" />
+
+								<echo>Creating dmgr link as jvm1 on host @{hostname}...</echo>
+
+								<configureTivoliLink hostname="@{hostname}"
+
+									source="${env.profilehome}/dmgr/logs/dmgr" target="/opt/Tivoli/tecad/logfiles/jvm1" />
+
+							</then>
+
+							<else>
+
+								<map2pair target="deployTivoliLogfileLinks" inheritall="true"
+
+									list1="${env.fo.node.name}" list2="${env.fo.node.server.name}"
+
+									only="@{hostname}" />
+
+								<map2pair target="deployTivoliLogfileLinks" inheritall="true"
+
+									list1="${env.is.node.name}" list2="${env.is.node.server.name}"
+
+									only="@{hostname}" />
+
+								<for list="${env.webnodes}" parallel="false" param="p.host">
+
+									<sequential>
+
+										<if>
+
+											<bool>
+
+												<equals arg1="@{hostname}" arg2="@{p.host}" trim="yes" />
+
+											</bool>
+
+											<then>
+
+												<echo>Creating logs link as jvm1 on host @{hostname}...
+												</echo>
+
+												<configureTivoliLink hostname="@{hostname}"
+
+													source="${env.ihshome}/logs" target="/opt/Tivoli/tecad/logfiles/jvm1" />
+
+											</then>
+
+										</if>
+
+									</sequential>
+
+								</for>
+
+							</else>
+
+						</if>
+
+					</then>
+
+					<else>
+
+						<echo level="error">Invalid Tivoli directory:
+							/opt/Tivoli/tecad/logfiles/ on host @{hostname}</echo>
+
+						<echo level="warning">Skipping configuring Tivoli symbolic links</echo>
+
+					</else>
+
+				</if>
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ CONFIGURATION
+		TARGETS +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+
+	<target name="configureDmgr"
+		depends="deployInit,configureDmgrProfile,stopDmgrProcess,setDmgrProfilePermissions,setupDmgrUserProfile,startDmgrProcess" />
+
+	<target name="configureDmgrProfile" depends="deployInit">
+
+		<runsshexec hostname="${env.dmgr}"
+
+			command='ls ${env.profilehome}/${env.dmgrprofile}/bin/startManager.sh'
+
+			outputproperty="configureDmgrProfile.${env.dmgr}.check" />
+
+		<if>
+
+			<bool>
+
+				<isset property="configureDmgrProfile.${env.dmgr}.check" />
+
+			</bool>
+
+			<then>
+
+				<echo>Deployment manager profile already exists on host
+					${env.dmgr}...</echo>
+
+			</then>
+
+			<else>
+
+				<echo>Creating dmgr profile on host ${env.dmgr}...</echo>
+
+				<runsshexec hostname="${env.dmgr}"
+
+					command="${env.washome}/bin/manageprofiles.sh
+
+-create
+
+-templatePath ${env.washome}/profileTemplates/dmgr
+
+-profileName ${env.dmgrprofile}
+
+-profilePath ${env.profilehome}/${env.dmgrprofile}
+
+-nodeName ${env.dmgr}
+
+-cellName ${env.cell}
+
+-hostName ${env.dmgr}
+
+-defaultPorts"
+
+					outputproperty="configureDmgrProfile.${env.dmgr}.create" />
+
+				<if>
+
+					<bool>
+
+						<isset property="configureDmgrProfile.${env.dmgr}.create" />
+
+					</bool>
+
+					<else>
+
+						<echo level="error">Deployment manager profile creation on
+							${env.dmgr} failed. See log file entries below for the root
+							cause.</echo>
+
+						<checkLogFile hostname="${env.dmgr}"
+							command="cat ${env.washome}/logs/manageprofiles/create.log" />
+
+						<fail
+							message="Deployment manager profile creation failed on ${env.dmgr}. See log file entries above for the root cause." />
+
+					</else>
+
+				</if>
+
+				<var name="configureDmgrProfile.${env.dmgr}.create" unset="true" />
+
+			</else>
+
+		</if>
+
+		<var name="configureDmgrProfile.${env.dmgr}.check" unset="true" />
+
+	</target>
+
+	<target name="stopDmgrProcess" depends="deployInit">
+
+		<runsshexec hostname="${env.dmgr}"
+
+			command='su - ${env.procuser} -c "${env.profilehome}/${env.dmgrprofile}/bin/serverStatus.sh dmgr | grep stopped"'
+
+			outputproperty="stopDmgrProcess.${env.dmgr}.check" />
+
+		<if>
+
+			<bool>
+
+				<isset property="stopDmgrProcess.${env.dmgr}.check" />
+
+			</bool>
+
+			<then>
+
+				<echo>Deployment manager already stopped on host ${env.dmgr}...
+				</echo>
+
+			</then>
+
+			<else>
+
+				<echo>Stopping deployment manager on host ${env.dmgr}...</echo>
+
+				<runsshexec hostname="${env.dmgr}"
+
+					command='su - ${env.procuser} -c "${env.profilehome}/${env.dmgrprofile}/bin/stopManager.sh"'
+
+					outputproperty='stopDmgrProcess.${env.dmgr}.run' />
+
+				<if>
+
+					<bool>
+
+						<isset property="stopDmgrProcess.${env.dmgr}.run" />
+
+					</bool>
+
+					<else>
+
+						<echo level="error">Deployment manager on host ${env.dmgr} would not
+							stop. Check the startServer.log in the profile_home/logs
+							directory on host ${env.dmgr} for details. This build will stop
+							until this problem is sorted.</echo>
+
+						<fail
+							message="Deployment manager on host ${env.dmgr} would not stop. Check the startServer.log in the profile_home/logs directory on host ${env.dmgr} for details" />
+
+					</else>
+
+				</if>
+
+				<var name="stopDmgrProcess.@{hostname}.run" unset="true" />
+
+			</else>
+
+		</if>
+
+		<var name="stopDmgrProcess.@{hostname}.check" unset="true" />
+
+	</target>
+
+	<target name="setDmgrProfilePermissions" depends="deployInit">
+
+		<echo>Setting permissions for deployment manager profile on host
+			${env.dmgr}...</echo>
+
+		<runsshexec hostname="${env.dmgr}"
+
+			command="chown -R ${env.procuser}:wasgroup ${env.profilehome}/${env.dmgrprofile};chmod -R g+w ${env.profilehome}/${env.dmgrprofile}"
+
+			outputproperty="setDmgrProfilePermissions.${env.dmgr}.perms" />
+
+		<if>
+
+			<bool>
+
+				<isset property="setDmgrProfilePermissions.${env.dmgr}.perms" />
+
+			</bool>
+
+			<else>
+
+				<echo level="error">Setting the permisions for the Deployment manager
+					profile failed on host ${env.dmgr}.</echo>
+
+				<fail
+					message="Setting the permisions for the Deployment manager profile failed on host ${env.dmgr}." />
+
+			</else>
+
+		</if>
+
+		<var name="setDmgrProfilePermissions.${env.dmgr}.perms" unset="true" />
+
+	</target>
+
+	<target name="setupDmgrUserProfile" depends="deployInit">
+
+		<echo level="info">Setting up the user profile for ${env.procuser} on
+			host ${env.dmgr}...</echo>
+
+		<copy file="templates/profile_dmgr" todir="${tempdir}/${env.dmgr}"
+			overwrite="true" />
+
+		<copy file="templates/temp.properties" todir="${tempdir}/${env.dmgr}"
+			overwrite="true" />
+
+		<propertyfile file="${tempdir}/${env.dmgr}/temp.properties">
+
+			<entry key="@env.profilehome@" value="${env.profilehome}" />
+
+			<entry key="@env.dmgrprofile@" value="${env.dmgrprofile}" />
+
+		</propertyfile>
+
+		<replace file="${tempdir}/${env.dmgr}/profile_dmgr" summary="yes"
+			replacefilterfile="${tempdir}/${env.dmgr}/temp.properties" />
+
+		<echo level="info">Copying the .profile for user ${env.procuser} to the
+			users home directory on host ${env.dmgr}...</echo>
+
+		<runscp hostname="${env.dmgr}" file="${tempdir}/${env.dmgr}/profile_dmgr"
+			remoteTofile="/home/users/${env.procuser}/.profile" />
+
+		<echo level="info">Converting .profile for user ${env.procuser} from dos
+			to unix format on host ${env.dmgr}...</echo>
+
+		<runsshexec hostname="${env.dmgr}"
+
+			command='su - ${env.procuser} -c "dos2unix .profile .profile"'
+
+			outputproperty="setupDmgrUserProfile.${env.dmgr}.convert" />
+
+		<if>
+
+			<bool>
+
+				<isset property="setupDmgrUserProfile.${env.dmgr}.convert" />
+
+			</bool>
+
+			<else>
+
+				<echo level="error">Converting .profile for user ${env.procuser} from
+					dos to unix format on host ${env.dmgr} failed. The .profile file
+					will now be corrupt ad yo will have to run dos2unix on it manually.
+				</echo>
+
+				<fail
+					message="Converting .profile for user ${env.procuser} from dos to unix format on host ${env.dmgr} failed." />
+
+			</else>
+
+		</if>
+
+	</target>
+
+	<target name="startDmgrProcess" depends="deployInit">
+
+		<runsshexec hostname="${env.dmgr}"
+
+			command='su - ${env.procuser} -c "${env.profilehome}/${env.dmgrprofile}/bin/serverStatus.sh dmgr | grep STARTED"'
+
+			outputproperty="startDmgrProcess.${env.dmgr}.check" />
+
+		<if>
+
+			<bool>
+
+				<isset property="startDmgrProcess.${env.dmgr}.check" />
+
+			</bool>
+
+			<then>
+
+				<echo>Deployment manager already running on host ${env.dmgr}.</echo>
+
+			</then>
+
+			<else>
+
+				<echo>Starting deployment manager on host ${env.dmgr}...</echo>
+
+				<runsshexec hostname="${env.dmgr}"
+
+					command='su - ${env.procuser} -c "${env.profilehome}/${env.dmgrprofile}/bin/startManager.sh"'
+
+					outputproperty="startDmgrProcess.${env.dmgr}.run" />
+
+				<if>
+
+					<bool>
+
+						<isset property="startDmgrProcess.${env.dmgr}.run" />
+
+					</bool>
+
+					<else>
+
+						<echo level="error">Deployment manager on host ${env.dmgr} would no
+							start. Check the startServer.log in the profile_home/logs
+							directory on host ${env.dmgr} for details. This build will stop
+							until this problem is sorted.</echo>
+
+						<fail
+							message="Deployment manager on host ${env.dmgr} would not start. Check the startServer.log in the profile_home/logs directory on host ${env.dmgr} for details" />
+
+					</else>
+
+				</if>
+
+				<var name="startDmgrProcess.${env.dmgr}.run" unset="true" />
+
+			</else>
+
+		</if>
+
+		<var name="startDmgrProcess.${env.dmgr}.check" unset="true" />
+
+	</target>
+
+	<target name="configureNodes"
+		depends="deployInit,configureNodeProfile,stopNodeProcessRoot,setNodeProfilePermissions,setupNodeUserProfile,startNodeProcess" />
+
+	<target name="configureNodeProfile" depends="deployInit">
+
+		<for list="${env.appsrvnodes}" param="hostname" parallel="false"
+			keepgoing="true">
+
+			<sequential>
+
+				<echo level="info">Checking for an existing node profile on
+					@{hostname}...</echo>
+
+				<runsshexec hostname="@{hostname}"
+
+					command='ls ${env.profilehome}/${env.nodeprofile}/bin/startNode.sh'
+
+					outputproperty="configureNodeProfile.@{hostname}.check" />
+
+				<if>
+
+					<bool>
+
+						<isset property="configureNodeProfile.@{hostname}.check" />
+
+					</bool>
+
+					<then>
+
+						<echo>Node profile already exists on host @{hostname}...</echo>
+
+					</then>
+
+					<else>
+
+						<echo>Creating managed node profile on host @{hostname}...</echo>
+
+						<runsshexec hostname="@{hostname}"
+
+							command="${env.washome}/bin/manageprofiles.sh
+
+-create
+
+-templatePath ${env.washome}/profileTemplates/managed
+
+-profileName node
+
+-profilePath ${env.profilehome}/${env.nodeprofile}
+
+-nodeName @{hostname}
+
+-cellName @{hostname}
+
+-hostName @{hostname}
+
+-dmgrHost ${env.dmgr}
+
+-dmgrPort ${env.soap}
+
+-defaultPorts"
+
+							outputproperty="configureNodeProfile.@{hostname}.run" />
+
+						<if>
+
+							<bool>
+
+								<isset property="configureNodeProfile.@{hostname}.run" />
+
+							</bool>
+
+							<else>
+
+								<echo level="error">Managed node profile creation on @{hostname}
+									failed. See log file entries below for the root cause.</echo>
+
+								<checkLogFile hostname="@{hostname}"
+									command="cat ${env.washome}/logs/manageprofiles/create.log" />
+
+								<fail
+									message="Managed node profile creation failed on @{hostname}. See log file entries above for the root cause." />
+
+							</else>
+
+						</if>
+
+						<var name="configureNodeProfile.@{hostname}.run" unset="true" />
+
+					</else>
+
+				</if>
+
+				<var name="configureNodeProfile.@{hostname}.check" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="stopNodeProcessRoot" depends="deployInit">
+
+		<for list="${env.appsrvnodes}" param="hostname" parallel="true"
+			keepgoing="true">
+
+			<sequential>
+
+				<runsshexec hostname="@{hostname}"
+
+					command="${env.profilehome}/${env.nodeprofile}/bin/serverStatus.sh nodeagent | grep STARTED"
+
+					outputproperty="stopNodeProcessRoot.@{hostname}.check" />
+
+				<!-- runsshexec hostname="@{hostname}" command="ls ${env.profilehome}/${env.nodeprofile}/bin/stopNode.sh"
+					outputproperty="stopNodeProcessRoot.@{hostname}.check" / -->
+
+				<if>
+
+					<bool>
+
+						<isset property="stopNodeProcessRoot.@{hostname}.check" />
+
+					</bool>
+
+					<then>
+
+						<echo>Stoping nodeagent on host @{hostname}...</echo>
+
+						<runsshexec hostname="@{hostname}"
+
+							command="${env.profilehome}/${env.nodeprofile}/bin/stopNode.sh"
+
+							outputproperty="stopNodeProcessRoot.@{hostname}.run" />
+
+						<if>
+
+							<bool>
+
+								<isset property="stopNodeProcessRoot.@{hostname}.run" />
+
+							</bool>
+
+							<else>
+
+								<echo level="error">The
+									${env.profilehome}/${env.nodeprofile}/bin/stopNode.sh script
+									failed to run on host @{hostname}.</echo>
+
+								<checkLogFile hostname="@{hostname}"
+									command="cat ${env.profilehome}/${env.nodeprofile}/logs/nodeagent/stopServer.log" />
+
+								<fail
+									message="The ${env.profilehome}/${env.nodeprofile}/bin/stopNode.sh script failed to run on host @{hostname}." />
+
+							</else>
+
+						</if>
+
+						<var name="stopNodeProcessRoot.@{hostname}.run" unset="true" />
+
+					</then>
+
+					<else>
+
+						<echo level="error">The nodeagent on host @{hostname} is not running.
+						</echo>
+
+					</else>
+
+				</if>
+
+				<var name="stopNodeProcessRoot.@{hostname}.check" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="stopNodeProcess" depends="deployInit">
+
+		<for list="${env.appsrvnodes}" param="hostname" parallel="true"
+			keepgoing="true">
+
+			<sequential>
+
+				<runsshexec hostname="@{hostname}"
+
+					command='su - ${env.procuser} -c "${env.profilehome}/${env.nodeprofile}/bin/serverStatus.sh nodeagent | grep STARTED"'
+
+					outputproperty="stopNodeProcess.@{hostname}.check" />
+
+				<if>
+
+					<bool>
+
+						<isset property="stopNodeProcess.@{hostname}.check" />
+
+					</bool>
+
+					<then>
+
+						<echo>Stoping nodeagent on host @{hostname}...</echo>
+
+						<runsshexec hostname="@{hostname}"
+
+							command='su - ${env.procuser} -c "${env.profilehome}/${env.nodeprofile}/bin/stopNode.sh"'
+
+							outputproperty="stopNodeProcess.@{hostname}.run" />
+
+						<if>
+
+							<bool>
+
+								<isset property="stopNodeProcess.@{hostname}.run" />
+
+							</bool>
+
+							<else>
+
+								<echo level="error">The
+									${env.profilehome}/${env.nodeprofile}/bin/stopNode.sh script
+									failed to run on host @{hostname}.</echo>
+
+								<checkLogFile hostname="@{hostname}"
+									command="cat ${env.profilehome}/${env.nodeprofile}/logs/nodeagent/stopServer.log" />
+
+								<fail
+									message="The ${env.profilehome}/${env.nodeprofile}/bin/stopNode.sh script failed to run on host @{hostname}." />
+
+							</else>
+
+						</if>
+
+						<var name="stopNodeProcess.@{hostname}.run" unset="true" />
+
+					</then>
+
+					<else>
+
+						<echo level="error">The nodeagent on host @{hostname} is not running.
+						</echo>
+
+					</else>
+
+				</if>
+
+				<var name="stopNodeProcess.@{hostname}.check" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="setNodeProfilePermissions" depends="deployInit">
+
+		<for list="${env.appsrvnodes}" param="hostname" parallel="true"
+			keepgoing="true">
+
+			<sequential>
+
+				<echo>Setting permissions for node profile on host @{hostname}...
+				</echo>
+
+				<runsshexec hostname="@{hostname}"
+
+					command="chown -R ${env.procuser}:wasgroup ${env.profilehome}/${env.nodeprofile};chmod -R g+w ${env.profilehome}/${env.nodeprofile}"
+
+					outputproperty="setNodeProfilePermissions.@{hostname}" />
+
+				<if>
+
+					<bool>
+
+						<isset property="setNodeProfilePermissions.@{hostname}" />
+
+					</bool>
+
+					<else>
+
+						<echo level="error">Setting the permisions for the node profile
+							failed on host @{hostname}.</echo>
+
+						<fail
+							message="Setting the permisions for the node profile failed on host @{hostname}." />
+
+					</else>
+
+				</if>
+
+				<var name="setNodeProfilePermissions.@{hostname}" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="setupNodeUserProfile" depends="deployInit">
+
+		<for list="${env.appsrvnodes}" param="hostname" parallel="true"
+			keepgoing="true">
+
+			<sequential>
+
+				<echo>Setting the user profile for ${env.procuser} on host
+					@{hostname}...</echo>
+
+				<copy file="templates/profile_node" todir="${tempdir}/@{hostname}"
+					overwrite="true" />
+
+				<copy file="templates/temp.properties" todir="${tempdir}/@{hostname}"
+					overwrite="true" />
+
+				<propertyfile file="${tempdir}/@{hostname}/temp.properties">
+
+					<entry key="@env.profilehome@" value="${env.profilehome}" />
+
+					<entry key="@env.nodeprofile@" value="${env.nodeprofile}" />
+
+				</propertyfile>
+
+				<replace file="${tempdir}/@{hostname}/profile_node" summary="yes"
+					replacefilterfile="${tempdir}/@{hostname}/temp.properties" />
+
+				<echo level="info">Copying the .profile for user ${env.procuser} to
+					the users home directory on host @{hostname}...</echo>
+
+				<runscp hostname="@{hostname}" file="${tempdir}/@{hostname}/profile_node"
+					remoteTofile="/home/users/${env.procuser}/.profile" />
+
+				<echo level="info">Converting .profile for user ${env.procuser} from
+					dos to unix format on host @{hostname}...</echo>
+
+				<runsshexec hostname="@{hostname}"
+
+					command='su - ${env.procuser} -c "dos2unix .profile .profile"'
+
+					outputproperty="setupNodeUserProfile.@{hostname}.convert" />
+
+				<if>
+
+					<bool>
+
+						<isset property="setupNodeUserProfile.@{hostname}.convert" />
+
+					</bool>
+
+					<else>
+
+						<echo level="error">Converting .profile for user ${env.procuser} from
+							dos to unix format on host @{hostname} failed. The .profile file
+							will now be corrupt and you will have to run dos2unix on it
+							manually.</echo>
+
+						<fail
+							message="Converting .profile for user ${env.procuser} from dos to unix format on host @{hostname} failed." />
+
+					</else>
+
+				</if>
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="startNodeProcess" depends="deployInit">
+
+		<for list="${env.appsrvnodes}" param="hostname" parallel="true"
+			keepgoing="true">
+
+			<sequential>
+
+				<runsshexec hostname="@{hostname}"
+
+					command='su - ${env.procuser} -c "${env.profilehome}/${env.nodeprofile}/bin/serverStatus.sh nodeagent | grep STARTED"'
+
+					outputproperty="startNodeProcess.@{hostname}.check" />
+
+				<if>
+
+					<bool>
+
+						<isset property="startNodeProcess.@{hostname}.check" />
+
+					</bool>
+
+					<then>
+
+						<echo>The nodeagent is already running on host @{hostname}.</echo>
+
+					</then>
+
+					<else>
+
+						<echo>Starting nodeagent on host @{hostname}...</echo>
+
+						<runsshexec hostname="@{hostname}"
+
+							command='su - ${env.procuser} -c "${env.profilehome}/${env.nodeprofile}/bin/startNode.sh"'
+
+							outputproperty="startNodeProcess.@{hostname}.run" />
+
+						<if>
+
+							<bool>
+
+								<isset property="startNodeProcess.@{hostname}.run" />
+
+							</bool>
+
+							<else>
+
+								<echo level="error">The
+									${env.profilehome}/${env.nodeprofile}/bin/startNode.sh script
+									failed to run on host @{hostname}.</echo>
+
+								<checkLogFile hostname="@{hostname}"
+									command="cat ${env.profilehome}/${env.nodeprofile}/logs/nodeagent/startServer.log" />
+
+								<fail
+									message="The ${env.profilehome}/${env.nodeprofile}/bin/startNode.sh script failed to run on host @{hostname}." />
+
+							</else>
+
+						</if>
+
+						<var name="startNodeProcess.@{hostname}.run" unset="true" />
+
+					</else>
+
+				</if>
+
+				<var name="startNodeProcess.@{hostname}.check" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="configureWebs" depends="deployInit">
+
+		<for list="${env.webnodes}" param="hostname" parallel="false"
+			keepgoing="true">
+
+			<sequential>
+
+				<runsshexec hostname="${env.dmgr}"
+
+					command='ls ${env.profilehome}/${env.dmgrprofile}/config/cells/${env.cell}/nodes/@{hostname}-node/node.xml'
+
+					outputproperty="configureWebProfile.@{hostname}.check" />
+
+				<if>
+
+					<bool>
+
+						<isset property="configureWebProfile.@{hostname}.check" />
+
+					</bool>
+
+					<then>
+
+						<echo>Profile already exists for web node @{hostname}...</echo>
+
+					</then>
+
+					<else>
+
+						<echo>Setting up Web node profile on host @{hostname}...</echo>
+
+						<runsshexec hostname="${env.dmgr}"
+
+							command='su - ${env.procuser}
+
+-c "${env.washome}/bin/wsadmin.sh
+
+-f ${env.washome}/bin/configureWebserverDefinition.jacl
+
+@{hostname}
+
+IHS
+
+${env.ihshome}
+
+${env.ihshome}/conf/httpd.conf
+
+80
+
+MAP_ALL
+
+${env.ihshome}/Plugins
+
+unmanaged
+
+@{hostname}
+
+@{hostname}
+
+solaris
+
+88
+
+admin
+
+password"'
+
+							outputproperty="configureWebProfile.@{hostname}.install" />
+
+						<if>
+
+							<bool>
+
+								<isset property="configureWebProfile.@{hostname}.install" />
+
+							</bool>
+
+							<else>
+
+								<echo level="error">Profile creation for the web node failed for
+									@{hostname}.</echo>
+
+								<fail
+									message="Profile creation for the web node failed for @{hostname}." />
+
+							</else>
+
+						</if>
+
+						<var name="configureWebProfile.@{hostname}" unset="true" />
+
+					</else>
+
+				</if>
+
+				<var name="configureWebProfile.@{hostname}.check" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="configureGS"
+		depends="deployInit,setupDmgrSecurity,restartDmgr,setupNodeSecurity,restartNodes" />
+
+	<target name="setupDmgrSecurity" depends="deployInit">
+
+		<echo>Setting up global security on host ${env.dmgr}...</echo>
+
+		<runsshexec hostname="${env.dmgr}"
+
+			command='${env.profilehome}/${env.dmgrprofile}/bin/wsadmin.sh -lang jython -c "AdminTask.isGlobalSecurityEnabled()"'
+
+			outputproperty="configureGlobalSecurity.@{env.dmgr}.check" />
+
+		<echo>${configureGlobalSecurity.@{env.dmgr}.check}</echo>
+
+		<if>
+
+			<bool>
+
+				<contains string="${configureGlobalSecurity.@{env.dmgr}.check}"
+					substring="true" />
+
+			</bool>
+
+			<then>
+
+				<echo>Security already enabled.</echo>
+
+			</then>
+
+			<else>
+
+				<echo>Setting up global security...</echo>
+
+				<property name="ldap.bindDN"
+					value='"CN=!cmsdldap,OU=Service Accounts,OU=Delegation,DC=ds,DC=acc,DC=co,DC=nz"' />
+
+				<property name="ldap.baseDN" value='dc=ds,dc=acc,dc=co,dc=nz' />
+
+				<property name="ldap.bindPassword" value='ZAQ12wsx' />
+
+				<property name="ldap.hostname" value='10.243.11.1' />
+
+				<property name="ldap.port" value='389' />
+
+				<property name="ldap.type" value='ACTIVE_DIRECTORY' />
+
+				<property name="ldap.sslEnabled" value='false' />
+
+				<property name="ldap.secureApps" value='false' />
+
+				<property name="ldap.secureLocalResources" value='false' />
+
+				<property name="ldap.userRegistryType" value='LDAPUserRegistry' />
+
+				<property name="ldap.adminName" value='!cmsdldap' />
+
+				<copy file="templates/gs.py" todir="${tempdir}/${env.dmgr}"
+					overwrite="true" />
+
+				<copy file="templates/soap.client.props" todir="${tempdir}/${env.dmgr}"
+					overwrite="true" />
+
+				<copy file="templates/temp.properties" todir="${tempdir}/${env.dmgr}"
+					overwrite="true" />
+
+				<propertyfile file="${tempdir}/${env.dmgr}/temp.properties">
+
+					<entry key="@ldap.hostname@" value="${ldap.hostname}" />
+
+					<entry key="@ldap.port@" value="${ldap.port}" />
+
+					<entry key="@ldap.type@" value="${ldap.type}" />
+
+					<entry key="@ldap.baseDN@" value="${ldap.baseDN}" />
+
+					<entry key="@ldap.bindDN@" value="${ldap.bindDN}" />
+
+					<entry key="@ldap.bindPassword@" value="${ldap.bindPassword}" />
+
+					<entry key="@ldap.sslEnabled@" value="${ldap.sslEnabled}" />
+
+					<entry key="@ldap.secureApps@" value="${ldap.secureApps}" />
+
+					<entry key="@ldap.secureLocalResources@" value="${ldap.secureLocalResources}" />
+
+					<entry key="@ldap.userRegistryType@" value="${ldap.userRegistryType}" />
+
+					<entry key="@ldap.adminName@" value="${ldap.adminName}" />
+
+				</propertyfile>
+
+				<replace file="${tempdir}/${env.dmgr}/gs.py" summary="yes"
+					replacefilterfile="${tempdir}/${env.dmgr}/temp.properties" />
+
+				<replace file="${tempdir}/${env.dmgr}/soap.client.props"
+					summary="yes" replacefilterfile="${tempdir}/${env.dmgr}/temp.properties" />
+
+				<echo>Copying global security script to host ${env.dmgr}...</echo>
+
+				<runscp hostname="${env.dmgr}" file="${tempdir}/${env.dmgr}/gs.py"
+					remoteTofile="${env.washome}/profiles/dmgr/bin/gs.py" />
+
+				<echo>Running global security script on host ${env.dmgr}...</echo>
+
+				<runsshexec hostname="${env.dmgr}"
+
+					command="su - ${env.procuser} -c '${env.profilehome}/${env.dmgrprofile}/bin/wsadmin.sh -lang jython -f ${env.profilehome}/${env.dmgrprofile}/bin/gs.py'"
+
+					outputproperty="configureGlobalSecurity.${env.dmgr}.validate" />
+
+				<if>
+
+					<bool>
+
+						<isset property="configureGlobalSecurity.${env.dmgr}.validate" />
+
+					</bool>
+
+					<then>
+
+						<echo>Copying soap.client.props on host ${env.dmgr}...</echo>
+
+						<runscp hostname="${env.dmgr}" file="${tempdir}/${env.dmgr}/soap.client.props"
+
+							remoteTofile="${env.profilehome}/${env.dmgrprofile}/properties/soap.client.props" />
+
+						<echo>Encoding soap.client.props on host ${env.dmgr}...</echo>
+
+						<runsshexec hostname="${env.dmgr}"
+
+							command="su - ${env.procuser} -c '${env.profilehome}/${env.dmgrprofile}/bin/PropFilePasswordEncoder.sh ${env.profilehome}/${env.dmgrprofile}/properties/soap.client.props com.ibm.SOAP.loginPassword'"
+
+							outputproperty="configureGlobalSecurity.${env.dmgr}.encode" />
+
+						<if>
+
+							<bool>
+
+								<isset property="configureGlobalSecurity.${env.dmgr}.encode" />
+
+							</bool>
+
+							<else>
+
+								<echo>The soap.client.props files culdn't be encoded on host
+									${env.dmgr}.</echo>
+
+								<fail
+									message="The soap.client.props files culdn't be encoded on host ${env.dmgr}." />
+
+							</else>
+
+						</if>
+
+					</then>
+
+					<else>
+
+						<echo>The global security enabling script didn't run on host
+							${env.dmgr}.</echo>
+
+						<fail
+							message="The global security enabling script didn't run on host ${env.dmgr}." />
+
+					</else>
+
+				</if>
+
+			</else>
+
+		</if>
+
+	</target>
+
+	<target name="setupNodeSecurity" depends="deployInit">
+
+		<for list="${env.appsrvnodes}" param="hostname" parallel="true"
+			keepgoing="true">
+
+			<sequential>
+
+				<copy file="templates/soap.client.props" todir="${tempdir}/@{hostname}"
+					overwrite="true" />
+
+				<copy file="templates/temp.properties" todir="${tempdir}/@{hostname}"
+					overwrite="true" />
+
+				<propertyfile file="${tempdir}/@{hostname}/temp.properties">
+
+					<entry key="@ldap.hostname@" value="${ldap.hostname}" />
+
+					<entry key="@ldap.port@" value="${ldap.port}" />
+
+					<entry key="@ldap.type@" value="${ldap.type}" />
+
+					<entry key="@ldap.baseDN@" value="${ldap.baseDN}" />
+
+					<entry key="@ldap.bindDN@" value="${ldap.bindDN}" />
+
+					<entry key="@ldap.bindPassword@" value="${ldap.bindPassword}" />
+
+					<entry key="@ldap.sslEnabled@" value="${ldap.sslEnabled}" />
+
+					<entry key="@ldap.secureApps@" value="${ldap.secureApps}" />
+
+					<entry key="@ldap.secureLocalResources@" value="${ldap.secureLocalResources}" />
+
+					<entry key="@ldap.userRegistryType@" value="${ldap.userRegistryType}" />
+
+					<entry key="@ldap.adminName@" value="${ldap.adminName}" />
+
+				</propertyfile>
+
+				<replace file="${tempdir}/@{hostname}/soap.client.props"
+					summary="yes" replacefilterfile="${tempdir}/@{hostname}/temp.properties" />
+
+				<echo>Setting up soap.client.props on host @{hostname}...</echo>
+
+				<runscp hostname="@{hostname}" file="${tempdir}/@{hostname}/soap.client.props"
+					remoteTofile="${env.profilehome}/${env.nodeprofile}/properties/soap.client.props" />
+
+				<runsshexec hostname="@{hostname}"
+
+					command="su - ${env.procuser} -c '${env.profilehome}/${env.nodeprofile}/bin/PropFilePasswordEncoder.sh ${env.profilehome}/${env.nodeprofile}/properties/soap.client.props com.ibm.SOAP.loginPassword'"
+
+					outputproperty="configureGlobalSecurity.@{hostname}.encode" />
+
+				<!-- if> <bool> <isset property="configureGlobalSecurity.@{hostname}.encode"
+					/> </bool> <else> <echo level="warning">SOAP.CLIENT.PROPS encode failed on
+					host @{hostname}. This is probably a bogus message he root cause of whis
+					is the sshexec target sucks, but you should check the soap.client.props file
+					just in case. You will also need to restart that node.</echo> </else> </if>
+					<var name="configureGlobalSecurity.@{hostname}.encode" unset="true"/ -->
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="restartNodes" depends="deployInit,stopNodeProcess,startNodeProcess" />
+
+	<target name="restartDmgr" depends="deployInit,stopDmgrProcess,startDmgrProcess" />
+
+	<!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ UTILITY
+		MACROS +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+
+	<macrodef name="configureTivoliLink">
+
+		<attribute name="hostname" />
+
+		<attribute name="source" />
+
+		<attribute name="target" />
+
+		<sequential>
+
+			<!-- echo>configureTivoliLink: hostname=@{hostname} source=@{source} target=@{target}</echo -->
+
+			<runsshexec hostname="@{hostname}"
+
+				command='rm -f @{target}; ln -s @{source} @{target}' outputproperty="configureTivoliLink.@{hostname}.symlink" />
+
+			<if>
+
+				<bool>
+
+					<isset property="configureTivoliLink.@{hostname}.symlink" />
+
+				</bool>
+
+				<else>
+
+					<echo level="error">Symbolic link from @{source} to @{target} on host
+						@{hostname} failed.</echo>
+
+					<fail
+						message="Symbolic link from @{source} to @{target} on host @{hostname} failed." />
+
+				</else>
+
+			</if>
+
+			<var name="configureTivoliLink.@{hostname}.symlink" unset="true" />
+
+		</sequential>
+
+	</macrodef>
+
+	<macrodef name="checkLogFile">
+
+		<attribute name="hostname" />
+
+		<attribute name="command" />
+
+		<sequential>
+
+			<runsshexec hostname="@{hostname}" command="@{command}"
+				outputproperty="checkLogFile.@{hostname}" />
+
+			<echo level="info">***************START OF LOG FILE FOR PREVIOUS
+				OPERATION********************</echo>
+
+			<echo level="error">${checkLogFile.@{hostname}}</echo>
+
+			<echo level="info">***************FINISH OF LOG FILE FOR PREVIOUS
+				OPERATION*******************</echo>
+
+		</sequential>
+
+	</macrodef>
+
+	<macrodef name="runsshexec">
+
+		<attribute name="hostname" />
+
+		<attribute name="command" />
+
+		<attribute name="username" default="root" />
+
+		<attribute name="outputproperty" />
+
+		<sequential>
+
+			<trycatch property="err.runsshexec.@{hostname}">
+
+				<try>
+
+					<echo level="debug">ssh @{hostname}:root "@{command}"</echo>
+
+					<sshexec host="@{hostname}" username="root" keyfile="${ssh.keyfile}"
+
+						passphrase="" trust="true" outputproperty="@{outputproperty}"
+
+						timeout="0" command="@{command}" />
+
+				</try>
+
+				<catch>
+
+					<echo level="info">@{hostname}: Caught exception:
+						${err.runsshexec.@{hostname}}</echo>
+
+					<var name="@{outputproperty}" unset="true" />
+
+				</catch>
+
+				<finally>
+
+					<var name="err.runsshexec.@{hostname}" unset="true" />
+
+				</finally>
+
+			</trycatch>
+
+		</sequential>
+
+	</macrodef>
+
+	<macrodef name="runscp">
+
+		<attribute name="hostname" />
+
+		<attribute name="file" />
+
+		<attribute name="remoteTofile" />
+
+		<sequential>
+
+			<echo level="debug">scp @{file} root@@@{hostname}:@{remoteTofile}</echo>
+
+			<scp keyfile="${ssh.keyfile}" passphrase="" trust="true" file="@{file}"
+
+				remoteTofile="root@@@{hostname}:@{remoteTofile}" verbose="true" />
+
+		</sequential>
+
+	</macrodef>
+
+	<!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ DELETE
+		TARGETS +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+
+	<target name="uninstallBase" depends="deployInit">
+
+		<for list="${env.dmgr},${env.appsrvnodes}" param="hostname"
+			parallel="true" keepgoing="true">
+
+			<sequential>
+
+				<echo>Checking to see if WebSphere is installed on host
+					@{hostname}...</echo>
+
+				<runsshexec hostname="@{hostname}"
+
+					command='ls ${env.washome}/bin/serverStatus.sh' outputproperty="uninstallBase.@{hostname}.checkforwas" />
+
+				<if>
+
+					<bool>
+
+						<isset property="uninstallBase.@{hostname}.checkforwas" />
+
+					</bool>
+
+					<then>
+
+						<echo>Checking to see if there are any running WebSphere processes
+							on host @{hostname}...</echo>
+
+						<runsshexec hostname="@{hostname}"
+
+							command='su - ${env.procuser} -c "${env.washome}/bin/serverStatus.sh -all | grep STARTED"'
+
+							outputproperty="uninstallBase.@{hostname}.check" />
+
+						<if>
+
+							<bool>
+
+								<isset property="uninstallBase.@{hostname}.check" />
+
+							</bool>
+
+							<then>
+
+								<echo level="error">There are WebSphere processes running on the
+									host @{hostname}. You will need to shut them down before you
+									can uninstall the product.</echo>
+
+								<fail
+									message="There are WebSphere processes running on the host @{hostname}. You will need to shut them down before you can uninstall the product." />
+
+							</then>
+
+							<else>
+
+								<echo>Uninstalling base product on host @{hostname}...</echo>
+
+								<runsshexec hostname="@{hostname}"
+
+									command="${env.washome}/uninstall/uninstall -silent"
+
+									outputproperty="uninstallBase.@{hostname}.uninstall" />
+
+								<if>
+
+									<bool>
+
+										<isset property="uninstallBase.@{hostname}.uninstall" />
+
+									</bool>
+
+									<else>
+
+										<echo level="error">Uninstallation failed on @{hostname}.</echo>
+
+										<checkLogFile hostname="@{hostname}"
+											command="cat ${env.washome}/logs/uninstall/log.txt" />
+
+										<fail
+											message="Base WebSphere uninstallation failed on @{hostname}. See log file entries above for the root cause." />
+
+									</else>
+
+								</if>
+
+								<var name="uninstallBase.@{hostname}.uninstall" unset="true" />
+
+							</else>
+
+						</if>
+
+						<var name="uninstallBase.@{hostname}.check" unset="true" />
+
+					</then>
+
+					<else>
+
+						<echo level="warning">WebSphere not installed on host @{hostname} in
+							directory ${env.washome}.</echo>
+
+					</else>
+
+				</if>
+
+				<var name="uninstallBase.@{hostname}.checkforwas" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="deleteBase" depends="uninstallBase">
+
+		<for list="${env.dmgr},${env.appsrvnodes}" param="hostname"
+			parallel="true" keepgoing="true">
+
+			<sequential>
+
+				<runsshexec hostname="@{hostname}" command='ls ${env.washome}/*'
+
+					outputproperty="deleteBase.@{hostname}.checkforwas" />
+
+				<if>
+
+					<bool>
+
+						<isset property="deleteBase.@{hostname}.checkforwas" />
+
+					</bool>
+
+					<then>
+
+						<echo>Removing WebSphere on host @{hostname}...</echo>
+
+						<runsshexec hostname="@{hostname}" command="rm -r ${env.washome}/*"
+
+							outputproperty="deleteBase.@{hostname}.remove" />
+
+						<if>
+
+							<bool>
+
+								<isset property="deleteBase.@{hostname}.remove" />
+
+							</bool>
+
+							<else>
+
+								<echo level="error">Removal of ${env.washome} directory contents on
+									host @{hostname} failed.</echo>
+
+								<fail
+									message="Removal of directory contents on host @{hostname} failed. Try deleting the files under the WebSphere root directory manually." />
+
+							</else>
+
+						</if>
+
+						<var name="uninstallBase.@{hostname}.remove" unset="true" />
+
+					</then>
+
+					<else>
+
+						<echo level="warning">WebSphere directory already empty on host
+							@{hostname}.</echo>
+
+					</else>
+
+				</if>
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="uninstallIHS" depends="deployInit">
+
+		<for list="${env.webnodes}" param="hostname" parallel="true"
+			keepgoing="true">
+
+			<sequential>
+
+				<echo>Searching for an existing IHS installation on host
+					@{hostname}...</echo>
+
+				<runsshexec hostname="@{hostname}"
+
+					command='ls ${env.ihshome}/version.signature' outputproperty="uninstallIHS.@{hostname}.check" />
+
+				<if>
+
+					<bool>
+
+						<isset property="uninstallIHS.@{hostname}.check" />
+
+					</bool>
+
+					<then>
+
+						<echo>Uninstalling IHS on host @{hostname}...</echo>
+
+						<runsshexec hostname="@{hostname}"
+
+							command="${env.ihshome}/uninstall/uninstall -silent"
+
+							outputproperty="uninstallIHS.@{hostname}.uninstall" />
+
+						<if>
+
+							<bool>
+
+								<isset property="uninstallIHS.@{hostname}.uninstall" />
+
+							</bool>
+
+							<else>
+
+								<echo level="error">Uninstallation of IHS failed on @{hostname}.
+								</echo>
+
+								<checkLogFile hostname="@{hostname}"
+									command="cat ${env.ihshome}/logs/install/log.txt" />
+
+								<fail
+									message="WebSphere IHS uninstallation failed on @{hostname}. See log file entries above for the root cause." />
+
+							</else>
+
+						</if>
+
+						<var name="uninstallIHS.@{hostname}.uninstall" unset="true" />
+
+					</then>
+
+					<else>
+
+						<echo level="warning">IHS not installed on host @{hostname}...</echo>
+
+					</else>
+
+				</if>
+
+				<var name="uninstallIHS.@{hostname}.check" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="deleteIHS" depends="uninstallIHS">
+
+		<for list="${env.webnodes}" param="hostname" parallel="true"
+			keepgoing="true">
+
+			<sequential>
+
+				<runsshexec hostname="@{hostname}" command='ls ${env.ihshome}/*'
+
+					outputproperty="deleteIHS.@{hostname}.check" />
+
+				<if>
+
+					<bool>
+
+						<isset property="deleteIHS.@{hostname}.check" />
+
+					</bool>
+
+					<then>
+
+						<echo>Removing ${env.ihshome} directory on @{hostname}...</echo>
+
+						<runsshexec hostname="@{hostname}" command="rm -r ${env.ihshome}"
+
+							outputproperty="deleteIHS.@{hostname}.remove" />
+
+						<if>
+
+							<bool>
+
+								<isset property="deleteIHS.@{hostname}.remove" />
+
+							</bool>
+
+							<else>
+
+								<echo level="error">Removal of IHS directory on host @{hostname}
+									failed.</echo>
+
+								<fail
+									message="Removal of IHS directory on host @{hostname} failed. Try removing the IHS directory manually." />
+
+							</else>
+
+						</if>
+
+						<var name="deleteIHS.@{hostname}.remove" unset="true" />
+
+					</then>
+
+					<else>
+
+						<echo>IHS directory already empty on @{hostname}...</echo>
+
+					</else>
+
+				</if>
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="uninstallUpdt" depends="deployInit">
+
+		<for list="${env.dmgr},${env.appsrvnodes},${env.webnodes}" param="hostname"
+			parallel="true" keepgoing="true">
+
+			<sequential>
+
+				<echo>Searching for an existing WebSphere UpdateInstaller
+					installation on host @{hostname}...</echo>
+
+				<runsshexec hostname="@{hostname}"
+
+					command='ls ${env.updtinstaller}/version.txt' outputproperty="uninstallUpdt.@{hostname}.check" />
+
+				<if>
+
+					<bool>
+
+						<isset property="uninstallUpdt.@{hostname}.check" />
+
+					</bool>
+
+					<then>
+
+						<echo>Uninstalling UpdateInstaller on host @{hostname}...</echo>
+
+						<runsshexec hostname="@{hostname}"
+
+							command="${env.updtinstaller}/uninstall/uninstall -silent"
+
+							outputproperty="uninstallUpdt.@{hostname}.uninstall" />
+
+						<if>
+
+							<bool>
+
+								<isset property="uninstallUpdt.@{hostname}.uninstall" />
+
+							</bool>
+
+							<else>
+
+								<echo level="error">Uninstallation of UpdateInstaller failed on
+									@{hostname}.</echo>
+
+								<checkLogFile hostname="@{hostname}"
+									command="cat ${env.updtinstaller}/logs/install/log.txt" />
+
+								<fail
+									message="WebSphere UpdateInstaller uninstallation failed on @{hostname}. See log file entries above for the root cause." />
+
+							</else>
+
+						</if>
+
+						<var name="uninstallUpdt.@{hostname}.uninstall" unset="true" />
+
+					</then>
+
+					<else>
+
+						<echo>UpdateInstaller not found on host @{hostname}...</echo>
+
+					</else>
+
+				</if>
+
+				<var name="uninstallUpdt.@{hostname}.check" unset="true" />
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+	<target name="deleteUpdt" depends="uninstallUpdt">
+
+		<for list="${env.dmgr},${env.appsrvnodes},${env.webnodes}" param="hostname"
+			parallel="true" keepgoing="true">
+
+			<sequential>
+
+				<runsshexec hostname="@{hostname}"
+
+					command='ls ${env.updtinstaller}/version.txt' outputproperty="deleteUpdt.@{hostname}.check" />
+
+				<if>
+
+					<bool>
+
+						<isset property="deleteUpdt.@{hostname}.check" />
+
+					</bool>
+
+					<then>
+
+						<echo>Removing UpdateInstaller directory on host @{hostname}...
+						</echo>
+
+						<runsshexec hostname="@{hostname}" command="rm -r ${env.updtinstaller}"
+
+							outputproperty="deleteUpdt.@{hostname}.remove" />
+
+						<if>
+
+							<bool>
+
+								<isset property="deleteUpdt.@{hostname}.remove" />
+
+							</bool>
+
+							<else>
+
+								<echo level="error">Removal of UpdateInstaller directory on host
+									@{hostname} failed.</echo>
+
+								<fail
+									message="Removal of UpdateInstaller directory on host @{hostname} failed. Try removing the updateinstaller manually." />
+
+							</else>
+
+						</if>
+
+						<var name="deleteUpdt.@{hostname}.remove" unset="true" />
+
+					</then>
+
+					<else>
+
+						<echo>UpdateInstaller directory already empty on host
+							@{hostname}...</echo>
+
+					</else>
+
+				</if>
+
+			</sequential>
+
+		</for>
+
+	</target>
+
+</project>
+

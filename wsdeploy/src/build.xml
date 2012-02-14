@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="WASInstaller" default="installBase">
+
+	<taskdef resource="net/sf/antcontrib/antlib.xml" />
+
+	<target name="init">
+		<xmlproperty file="../conf/${env}.xml" semanticAttributes="true"
+			includeSemanticAttribute="true" />
+		<property name="wasInstallHome" value="C:/tmp/was_nd_7/disk1" />
+		<property name="updtInstallHome"
+			value="C:/tmp/was_nd_7/updateInstaller/UpdateInstaller" />
+		<property name="fxpkHome" value="C:/tmp/was_nd_7" />
+		<property name="ihsInstallHome" value="C:/tmp/was_nd_7/disk2/IHS" />
+	</target>
+
+	<target name="install" depends="init">
+		<echo message="Installing WAS..." level="info"/>
+	</target>
+
+	<target name="installBase" depends="install">
+		<for list="${env.install.dmgr},${env.install.nodes}" param="hostname"
+			parallel="true" keepgoing="true">
+			<sequential>
+				<echo message="Searching for an existing WebSphere installation on host" level="info"/>
+				<condition property="installbase.@{hostname}.check">
+					<or>
+						<resourceexists>
+							<file file="${env.install.dir}/bin/verifyinstallver.sh" />
+						</resourceexists>
+						<resourceexists>
+							<file file="${env.install.dir}/bin/verifyinstallver.bat" />
+						</resourceexists>
+					</or>
+				</condition>
+				<if>
+					<isset property="${installbase.@{hostname}.check}" />
+					<then>
+						<echo message="WebSphere already installed on @{hostname}"
+							level="warning" />
+					</then>
+					<else>
+						<echo message="Installing base product on host @{hostname}..."
+							level="info" />
+						<exec dir="${wasInstallHome}/WAS" executable="install"
+							outputproperty="installbase.@{hostname}.install" osfamily="unix">
+							<arg
+								line="
+								-OPT feature=noFeature
+								-OPT allowNonRootSilentInstall=true
+								-OPT disableOSPrereqChecking=true
+								-OPT disableNonBlockingPrereqChecking=true
+								-OPT checkFilePermissions=true
+								-OPT PROF_enableAdminSecurity=false
+								-OPT silentInstallLicenseAcceptance=true
+								-OPT installLocation=${env.install.dir}
+								-OPT installType=installNew
+								-OPT profileType=none -silent" />
+						</exec>
+						<exec executable="${wasInstallHome}/WAS/install.exe"
+							outputproperty="installbase.@{hostname}.install" osfamily="windows">
+							<arg
+								line="
+								-OPT feature=noFeature
+								-OPT allowNonRootSilentInstall=true
+								-OPT disableOSPrereqChecking=true
+								-OPT disableNonBlockingPrereqChecking=true
+								-OPT checkFilePermissions=true
+								-OPT PROF_enableAdminSecurity=false
+								-OPT silentInstallLicenseAcceptance=true
+								-OPT installLocation=${env.install.dir}
+								-OPT installType=installNew
+								-OPT profileType=none -silent" />
+						</exec>
+						<if>
+							<isset property="installbase.@{hostname}.install" />
+							<else>
+								<echo
+									message="Base WebSphere installation failed on @{hostname}. See log file entries below for the root cause."
+									level="error" />
+								<exec executable="type.exe" osfamily="windows">
+									<arg line="${env.install.dir}/logs/install/log.txt" />
+								</exec>
+								<exec executable="cat" osfamily="unix">
+									<arg line="${env.install.dir}/logs/install/log.txt" />
+								</exec>
+								<fail
+									message="Base WebSphere installation failed on @{hostname}. See log file entries above for the root cause." />
+							</else>
+						</if>
+						<var name="installbase.@{hostname}.install" unset="true" />
+					</else>
+				</if>
+				<var name="installbase.@{hostname}.check" unset="true" />
+			</sequential>
+		</for>
+	</target>
+</project>
+

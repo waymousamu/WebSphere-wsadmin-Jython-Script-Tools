@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<!DOCTYPE page [
+	<!ENTITY envid "mp66">
+	<!ENTITY cellname "CCITstLP0ECell001">
+	<!ENTITY dmgrnodebaseport "10">
+  	<!ENTITY dmgrhostname "DMGRHOSTLP0E.dmz.test">
+  	<!ENTITY allnodebaseport "10">
+  	<!ENTITY allnodesoapport "878">
+  	<!ENTITY node01name "X-CCITstLP0ENode001">
+  	<!ENTITY node01hostname "BET-CCIWAS001">
+  	<!ENTITY node01baseport "11">
+  	<!ENTITY app01name "AMS_TZEAR">
+	<!ENTITY app02name "AttachmentServiceEAR">
+	<!ENTITY app03name "AuthLogOffServiceEAR">
+	<!ENTITY app04name "AuthServiceExtEAR">
+	<!ENTITY app05name "CCIMessagingServiceExtEAR">
+	<!ENTITY app06name "TATTestEAR">
+	<!ENTITY app07name "VerifyInstall_EAR">
+  	<!ENTITY cluster01name "CLTLPOEAts001">
+  	<!ENTITY server01name "X-CMTLPOEAtsSrv001">
+	<!ENTITY cluster02name "CLTLPOEAuth001">
+  	<!ENTITY server02name "X-CMTLPOEAuthSrv001">
+	<!ENTITY cluster03name "CLTLPOEMms001">
+  	<!ENTITY server03name "X-CMTLPOEMmsSrv001">
+  	<!ENTITY runAsUser "was61">
+  	<!ENTITY runAsGroup "was61">
+  	<!ENTITY initialHeapSize "128">
+  	<!ENTITY maximumHeapSize "256">
+  	<!ENTITY genericJvmArguments "-Xbootclasspath/p:/opt/Introscope/agent/wily/connectors/AutoProbeConnector.jar:/opt/Introscope/agent/wily/Agent.jar		-Dcom.wily.introscope.agentProfile=/opt/Introscope/agent/wily/IntroscopeAgent_ATS.profile -Dcom.wily.autoprobe.ignoreTinyClassArrays=true -Dcom.ibm.wsspi.security.crypto.customPasswordEncryptionClass=com.euroclear.was.security.TripleDESPasswordEncryption -Dcom.ibm.wsspi.security.crypto.customPasswordEncryptionEnabled=true">
+]>
+<env name="&envid;">
+	<Cell name="&cellname;"/>
+	<dmgr host="&dmgrhostname;" port="&allnodebaseport;&allnodesoapport;"/>
+	<node name="&node01name;" hostname="&node01hostname;" soapport="&node01baseport;&allnodesoapport;"/>
+	<ServerCluster name="&cluster01name;">
+		<ClusterMember memberName="&server01name;" nodeName="&node01name;"/>
+	</ServerCluster>
+	<ServerCluster name="&cluster02name;">
+		<ClusterMember memberName="&server02name;" nodeName="&node01name;"/>
+	</ServerCluster>
+	<ServerCluster name="&cluster03name;">
+		<ClusterMember memberName="&server03name;" nodeName="&node01name;"/>
+	</ServerCluster>
+	<Server name="&server01name;" clusterName="&cluster01name;">
+		<JavaProcessDef>
+			<ProcessExecution runAsUser="&runAsUser;" runAsGroup="&runAsGroup;"/>
+			<JavaVirtualMachine initialHeapSize="&initialHeapSize;" maximumHeapSize="&maximumHeapSize;" genericJvmArguments="&genericJvmArguments;"/>
+		</JavaProcessDef>
+	</Server>	
+</env>
