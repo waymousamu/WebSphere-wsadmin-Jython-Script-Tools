@@ -209,25 +209,45 @@ class TestProcessCommandsBASE(unittest.TestCase):
             if AdminConfig.showAttribute(item, 'alias') == 'local_oracle_alias':
                 self.assertEqual(AdminConfig.showAttribute(item, 'userId'), 'swaymouth')
 
-    def testMQCFCreate(self):
-        self.cg.generateCommands(cmdList=[{'MQQueueConnectionFactory': {'transportType': 'BINDINGS_THEN_CLIENT', 'port': '1415', 'name': 'QCF1', 'scope': '/Cell:cell01/', 'host': 'localhost', 'channel': 'CH1', 'queueManager': 'QMGR1', 'jndiName': 'jms/QCF1'}}, {'connectionPool': {'maxConnections': '200', 'scope': '/MQQueueConnectionFactory:QCF1/'}}], action='W')
+    def testMQQCFCreate(self):
+        self.cg.generateCommands(cmdList=[{'MQQueueConnectionFactory': {'transportType': 'BINDINGS_THEN_CLIENT', 'port': '1415', 'name': 'QCF1', 'scope': '/Cell:cell01/', 'host': 'localhost', 'channel': 'CH1', 'queueManager': 'QMGR1', 'jndiName': 'jms/QCF1'}}, {'connectionPool': {'maxConnections': '200', 'scope': '/MQQueueConnectionFactory:QCF1/', 'minConnections' : '0'}}, {'sessionPool': {'minConnections': '0', 'scope': '/MQQueueConnectionFactory:QCF1/'}}], action='W')
         self.mqcf = AdminConfig.getid('/MQQueueConnectionFactory:QCF1/')
         self.jndiName=AdminConfig.showAttribute(self.mqcf, 'jndiName')
         self.assertEqual(self.jndiName, 'jms/QCF1')
 
-    def testMQCFModify(self):
+    def testMQQCFModify(self):
         self.cg.generateCommands(cmdList=[{'MQQueueConnectionFactory': {'transportType': 'BINDINGS_THEN_CLIENT', 'port': '1415', 'name': 'QCF1', 'scope': '/Cell:cell01/', 'host': 'localhost', 'channel': 'CH1', 'queueManager': 'QMGR1', 'jndiName': 'jms/QCF1'}}], action='W')
         self.cg.generateCommands(cmdList=[{'MQQueueConnectionFactory': {'transportType': 'BINDINGS_THEN_CLIENT', 'port': '1415', 'name': 'QCF1', 'scope': '/Cell:cell01/', 'host': 'localhost', 'channel': 'CH1', 'queueManager': 'QMGR1', 'jndiName': 'jms/BogusName'}}], action='W')
         self.mqcf = AdminConfig.getid('/MQQueueConnectionFactory:QCF1/')
         self.jndiName=AdminConfig.showAttribute(self.mqcf, 'jndiName')
         self.assertEqual(self.jndiName, 'jms/BogusName')
 
-    def testMQCFRead(self):
+    def testMQQCFRead(self):
         self.cg.generateCommands(cmdList=[{'MQQueueConnectionFactory': {'transportType': 'BINDINGS_THEN_CLIENT', 'port': '1415', 'name': 'QCF1', 'scope': '/Cell:cell01/', 'host': 'localhost', 'channel': 'CH1', 'queueManager': 'QMGR1', 'jndiName': 'jms/QCF1'}}], action='W')
         self.cg.generateCommands(cmdList=[{'MQQueueConnectionFactory': {'transportType': 'BINDINGS_THEN_CLIENT', 'port': '1415', 'name': 'QCF1', 'scope': '/Cell:cell01/', 'host': 'localhost', 'channel': 'CH1', 'queueManager': 'QMGR1', 'jndiName': 'jms/BogusName'}}])
         self.mqcf = AdminConfig.getid('/MQQueueConnectionFactory:QCF1/')
         self.jndiName=AdminConfig.showAttribute(self.mqcf, 'jndiName')
         self.assertEqual(self.jndiName, 'jms/QCF1')
+
+    def testMQQCreate(self):
+        self.cg.generateCommands(cmdList=[{'MQQueue' : {'name' : 'AccountingHVMessageSendQueue', 'jndiName' : 'dovetail/jms/AccountingHVMessageSendQueue', 'persistence' : 'PERSISTENT', 'baseQueueName' : 'AccountingHVMessageSendQueue', 'baseQueueManagerName' : 'QMGR1', 'queueManagerHost' : 'localhost', 'queueManagerPort' : '1415', 'serverConnectionChannelName' : 'CH1', 'scope': '/Cell:cell01/'}}], action='W')
+        self.mqq = AdminConfig.getid('/MQQueue:AccountingHVMessageSendQueue/')
+        self.jndiName=AdminConfig.showAttribute(self.mqq, 'jndiName')
+        self.assertEqual(self.jndiName, 'dovetail/jms/AccountingHVMessageSendQueue')
+
+    def testMQQModify(self):
+        self.cg.generateCommands(cmdList=[{'MQQueue' : {'name' : 'AccountingHVMessageSendQueue', 'jndiName' : 'dovetail/jms/AccountingHVMessageSendQueue', 'persistence' : 'PERSISTENT', 'baseQueueName' : 'AccountingHVMessageSendQueue', 'baseQueueManagerName' : 'QMGR1', 'queueManagerHost' : 'localhost', 'queueManagerPort' : '1415', 'serverConnectionChannelName' : 'CH1', 'scope': '/Cell:cell01/'}}], action='W')
+        self.cg.generateCommands(cmdList=[{'MQQueue' : {'name' : 'AccountingHVMessageSendQueue', 'jndiName' : 'jms/Bogus', 'persistence' : 'PERSISTENT', 'baseQueueName' : 'AccountingHVMessageSendQueue', 'baseQueueManagerName' : 'QMGR1', 'queueManagerHost' : 'localhost', 'queueManagerPort' : '1415', 'serverConnectionChannelName' : 'CH1', 'scope': '/Cell:cell01/'}}], action='W')
+        self.mqq = AdminConfig.getid('/MQQueue:AccountingHVMessageSendQueue/')
+        self.jndiName=AdminConfig.showAttribute(self.mqq, 'jndiName')
+        self.assertEqual(self.jndiName, 'jms/Bogus')
+
+    def testMQQRead(self):
+        self.cg.generateCommands(cmdList=[{'MQQueue' : {'name' : 'AccountingHVMessageSendQueue', 'jndiName' : 'dovetail/jms/AccountingHVMessageSendQueue', 'persistence' : 'PERSISTENT', 'baseQueueName' : 'AccountingHVMessageSendQueue', 'baseQueueManagerName' : 'QMGR1', 'queueManagerHost' : 'localhost', 'queueManagerPort' : '1415', 'serverConnectionChannelName' : 'CH1', 'scope': '/Cell:cell01/'}}], action='W')
+        self.cg.generateCommands(cmdList=[{'MQQueue' : {'name' : 'AccountingHVMessageSendQueue', 'jndiName' : 'jms/Bogus', 'persistence' : 'PERSISTENT', 'baseQueueName' : 'AccountingHVMessageSendQueue', 'baseQueueManagerName' : 'QMGR1', 'queueManagerHost' : 'localhost', 'queueManagerPort' : '1415', 'serverConnectionChannelName' : 'CH1', 'scope': '/Cell:cell01/'}}])
+        self.mqq = AdminConfig.getid('/MQQueue:AccountingHVMessageSendQueue/')
+        self.jndiName=AdminConfig.showAttribute(self.mqq, 'jndiName')
+        self.assertEqual(self.jndiName, 'dovetail/jms/AccountingHVMessageSendQueue')
 
 if __name__ == '__main__' or __name__ == 'main':
     suite = unittest.TestLoader().loadTestsFromTestCase(TestProcessCommandsBASE)

@@ -42,7 +42,9 @@ CONFDICT_BASE = [
                  {'J2EEResourceProperty': {'name': 'validateNewConnectionRetryInterval', 'scope': '/DataSource:Q5DataSource/', 'type': 'java.lang.Long', 'value': '5'}},
                  {'ConnectionPool': {'maxConnections': '1000', 'scope': '/DataSource:Q5DataSource/', 'testConnectionInterval': '3', 'minConnections': '5', 'testConnection': 'true'}},
                  {'MQQueueConnectionFactory': {'transportType': 'BINDINGS_THEN_CLIENT', 'port': '1415', 'name': 'QCF1', 'scope': '/Cell:HP8200SWaymouthNode01Cell/', 'host': 'localhost', 'channel': 'CH1', 'queueManager': 'QMGR1', 'jndiName': 'jms/QCF1'}},
-                 {'connectionPool': {'maxConnections': '200', 'scope': '/MQQueueConnectionFactory:QCF1/'}}
+                 {'connectionPool': {'maxConnections': '200', 'scope': '/MQQueueConnectionFactory:QCF1/'}},
+                 {'sessionPool': {'minConnections': '0', 'scope': '/MQQueueConnectionFactory:QCF1/'}},
+                 {'MQQueue' : {'name' : 'AccountingHVMessageSendQueue', 'jndiName' : 'dovetail/jms/AccountingHVMessageSendQueue', 'persistence' : 'PERSISTENT', 'baseQueueName' : 'AccountingHVMessageSendQueue', 'baseQueueManagerName' : 'QMGR1', 'queueManagerHost' : 'localhost', 'queueManagerPort' : '1415', 'serverConnectionChannelName' : 'CH1', 'scope': '/Cell:HP8200SWaymouthNode01Cell/'}}
                  ]
 
 CONFXML_BASE = """
@@ -75,8 +77,10 @@ CONFXML_BASE = """
                     <MQQueueConnectionFactory name="QCF1" jndiName="jms/QCF1" queueManager="QMGR1" host="localhost" port="1415" channel="CH1" transportType="BINDINGS_THEN_CLIENT">
                         <J2EEResourcePropertySet>
                             <connectionPool maxConnections="200"/>
+                            <sessionPool minConnections="0"/>
                         </J2EEResourcePropertySet>
                     </MQQueueConnectionFactory>
+                    <MQQueue name="AccountingHVMessageSendQueue" jndiName="dovetail/jms/AccountingHVMessageSendQueue" persistence="PERSISTENT" baseQueueName="AccountingHVMessageSendQueue" baseQueueManagerName="QMGR1" queueManagerHost="localhost" queueManagerPort="1415" serverConnectionChannelName="CH1"/>
                 </Cell>
             </env>
             """

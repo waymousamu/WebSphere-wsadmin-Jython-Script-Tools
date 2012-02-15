@@ -64,7 +64,7 @@ class ProcessCommands:
                 elif k == "JDBCProvider":
                     self.logger.debug("generateCommands: block = JDBCProvider")
                     self.processConfigItem(k=k, v=v)
-                elif k == "DataSource" or k == "MQQueueConnectionFactory":
+                elif k == "DataSource" or k == "MQQueueConnectionFactory" or k == 'MQQueue':
                     self.logger.debug("generateCommands: block = DataSource or MQQueueConnectionFactory")
                     t=None
                     if k == 'DataSource':
@@ -75,6 +75,9 @@ class ProcessCommands:
                     elif k == 'MQQueueConnectionFactory':
                         t = AdminConfig.listTemplates('MQQueueConnectionFactory', 'First Example WMQ QueueConnectionFactory')
                         v['scope'] = ('%sJMSProvider:WebSphere MQ JMS Provider/' % v['scope'])
+                    elif k == 'MQQueue':
+                        t = AdminConfig.listTemplates('MQQueue', 'Example.JMS.WMQ.Q1')
+                        v['scope'] = ('%sJMSProvider:WebSphere MQ JMS Provider/' % v['scope'])
                     self.processConfigItem(k=k, v=v, t=t)
                 elif k == "J2EEResourceProperty":
                     self.logger.debug("generateCommands: block = J2EEResourceProperty")
@@ -82,7 +85,7 @@ class ProcessCommands:
                 elif k == "JAASAuthData":
                     self.logger.debug("generateCommands: block = JAASAuthData")
                     self.processSecrurity(k=k, v=v)
-                elif k == "ConnectionPool" or k == "connectionPool":
+                elif k == "ConnectionPool" or k == "connectionPool" or k == "sessionPool":
                     self.logger.debug("generateCommands: block = ConnectionPool")
                     self.processNestedAttribute(k=k, v=v)
                 elif k == "JavaVirtualMachine" or k == "ProcessExecution":
@@ -126,7 +129,13 @@ class ProcessCommands:
         self.logger.debug("processNestedAttribute: key=%s, value=%s" % (k, v))
         if k and v != None:
             self.validateScope(v, 'processNestedAttribute')
-            attribute = AdminConfig.list('%s' % k, AdminConfig.getid(v['scope']))
+            attribute = None
+            if re.match("[a-z]", k):
+                self.logger.debug("processNestedAttribute: %s is a nested property." % k)
+                attribute=AdminConfig.showAttribute(AdminConfig.getid(v['scope']), k)
+            else:
+                attribute = AdminConfig.list('%s' % k, AdminConfig.getid(v['scope']))
+                self.logger.debug("processNestedAttribute: %s is an object." % k)
             for (k2, v2) in v.items():
                 if k2 != "scope":
                     actualValue=AdminConfig.showAttribute(attribute, k2)
