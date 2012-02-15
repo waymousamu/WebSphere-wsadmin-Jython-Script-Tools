@@ -21,7 +21,7 @@ class ProcessCommands:
         if self.cmdList == None:
             self.logger.error("generateCommands: No dictionary was passed to the generateCommands method")
             raise ProcessCommandException("No dictionary was passed to the generateCommands method")
-        self.logger.debug("generateCommands: self.cmdDict = %s " % self.cmdList)
+        self.logger.trace("generateCommands: self.cmdDict = %s " % self.cmdList)
         cellList = []
         dmgrList = []
         #envList = []
@@ -34,38 +34,38 @@ class ProcessCommands:
 
         for item in self.cmdList:
             self.cmdDict = item
-            self.logger.debug("generateCommands: item = %s" % item)
+            self.logger.trace("generateCommands: item = %s" % item)
             for k, v in self.cmdDict.items():
-                self.logger.debug("generateCommands: k = %s" % k )
-                self.logger.debug("generateCommands: v = %s" % v )
+                self.logger.trace("generateCommands: k = %s" % k )
+                self.logger.trace("generateCommands: v = %s" % v )
                 if k == "Cell":
                     self.logger.debug("generateCommands: block = Cell")
                     if AdminControl.getCell() != v['name']:
                         self.logger.error("generateCommands: Cell name %s != %s.  You may have connected to the wrong WebSphere environment or the name of the cell in the configuration xml is not correct." % (AdminControl.getCell(),v['name']))
                         raise ProcessCommandException("Cell name %s != %s.  You may have connected to the wrong WebSphere environment or the name of the cell in the configuration xml is not correct." % (AdminControl.getCell(),v['name']))
                 elif k == "ServerCluster":
-                    self.logger.debug("generateCommands: block = ServerCluster")
+                    self.logger.trace("generateCommands: block = ServerCluster")
                     scopeStr = ("AdminConfig.getid('%s')" % (v['scope']))
                     clusterStr = ("'[[name %s]]'" % (v['name']))
                     command = ("AdminConfig.create('%s', (%s), %s)" % (k, scopeStr, clusterStr))
-                    self.logger.debug("generateCommands: command = %s " % command)
+                    self.logger.trace("generateCommands: command = %s " % command)
                     clusterCmdList.append(command)
                 elif re.search("ClusterMember", k):
-                    self.logger.debug("generateCommands: block = ClusterMember")
+                    self.logger.trace("generateCommands: block = ClusterMember")
                     scopeStr = ("AdminConfig.getid('%s')" % (v['scope']))
                     nodeStr = ("AdminConfig.getid('/Node:%s/')" % (v['nodeName']))
                     clusterMemberName = ("[['memberName', '%s']]" % (v['memberName']))
                     command = ("AdminConfig.createClusterMember((%s), (%s), %s)" % (scopeStr, nodeStr, clusterMemberName))
-                    self.logger.debug("generateCommands: command = %s " % command)
+                    self.logger.trace("generateCommands: command = %s " % command)
                     clusterMemberCmdlist.append(command)
                 elif k == "Server":
-                    self.logger.debug("generateCommands: block = Server")
+                    self.logger.trace("generateCommands: block = Server")
                     self.processServer(k=k, v=v)
                 elif k == "JDBCProvider":
-                    self.logger.debug("generateCommands: block = JDBCProvider")
+                    self.logger.trace("generateCommands: block = JDBCProvider")
                     self.processConfigItem(k=k, v=v)
                 elif k == "DataSource" or k == "MQQueueConnectionFactory" or k == 'MQQueue':
-                    self.logger.debug("generateCommands: block = DataSource or MQQueueConnectionFactory")
+                    self.logger.trace("generateCommands: block = DataSource, MQQueueConnectionFactory, MQQueue")
                     t=None
                     if k == 'DataSource':
                         if v['providerType'] == 'Oracle JDBC Driver (XA)':
@@ -80,19 +80,22 @@ class ProcessCommands:
                         v['scope'] = ('%sJMSProvider:WebSphere MQ JMS Provider/' % v['scope'])
                     self.processConfigItem(k=k, v=v, t=t)
                 elif k == "J2EEResourceProperty":
-                    self.logger.debug("generateCommands: block = J2EEResourceProperty")
+                    self.logger.trace("generateCommands: block = J2EEResourceProperty")
                     self.processPropertySet(k=k, v=v)
                 elif k == "JAASAuthData":
-                    self.logger.debug("generateCommands: block = JAASAuthData")
+                    self.logger.trace("generateCommands: block = JAASAuthData")
                     self.processSecrurity(k=k, v=v)
                 elif k == "ConnectionPool" or k == "connectionPool" or k == "sessionPool":
-                    self.logger.debug("generateCommands: block = ConnectionPool")
+                    self.logger.trace("generateCommands: block = ConnectionPool, connectionPool, sessionPool")
                     self.processNestedAttribute(k=k, v=v)
                 elif k == "JavaVirtualMachine" or k == "ProcessExecution":
-                    self.logger.debug("generateCommands: block = JavaVirtualMachine or ProcessExecution")
+                    self.logger.trace("generateCommands: block = JavaVirtualMachine, ProcessExecution")
                     self.processNestedAttribute(k=k, v=v)
+                elif k == 'SIBus' or k == 'SIBusMember':
+                    self.logger.trace("generateCommands: block = SIBus, SIBusMember")
+                    self.processAdminTask(k=k, v=v)
                 elif k == "env" or k == "Node" or k == 'dmgr' or k == 'JMSProvider':
-                    self.logger.debug("generateCommands: block = env or Node or dmgr")
+                    self.logger.trace("generateCommands: block = env, Node, dmgr")
                     '''Ignore a tag'''
                     self.logger.info("generateCommands: ignoring tag %s" % k )
                 else:
@@ -256,27 +259,27 @@ class ProcessCommands:
 
     def processSecrurity(self, k=None, v=None):
         '''Used to process security properties'''
-        self.logger.debug("processSecrurity: key=%s, value=%s" % (k, v))
+        self.logger.trace("processSecrurity: key=%s, value=%s" % (k, v))
         if k and v != None:
             self.validateScope(v, 'processPropertySet')
             self.jaasAuthDataList = AdminConfig.list(k, AdminConfig.getid('%sSecurity:/' % v['scope'])).split('\r\n')
-            self.logger.debug("processSecrurity: jaasAuthDataList=%s"% self.jaasAuthDataList)
+            self.logger.trace("processSecrurity: jaasAuthDataList=%s"% self.jaasAuthDataList)
             for key in v.keys():
                 if key == 'alias':
-                    self.logger.debug("processSecrurity: key=%s, value=%s" % (key, v[key]))
+                    self.logger.trace("processSecrurity: key=%s, value=%s" % (key, v[key]))
                     itemFound="1"
-                    self.logger.debug("processSecrurity: items length is=%s" % len(self.jaasAuthDataList))
+                    self.logger.trace("processSecrurity: items length is=%s" % len(self.jaasAuthDataList))
                     for item in self.jaasAuthDataList:
-                        self.logger.debug("processSecrurity: item=%s" % item)
+                        self.logger.trace("processSecrurity: item=%s" % item)
                         if item != "":
-                            self.logger.debug("processSecrurity: name=%s" % AdminConfig.showAttribute(item, 'alias'))
+                            self.logger.trace("processSecrurity: name=%s" % AdminConfig.showAttribute(item, 'alias'))
                             if AdminConfig.showAttribute(item, 'alias') == v[key]:
-                                self.logger.debug("processSecrurity: checking alias %s" % AdminConfig.showAttribute(item,'alias'))
+                                self.logger.trace("processSecrurity: checking alias %s" % AdminConfig.showAttribute(item,'alias'))
                                 for key in v.keys():
                                     if key != 'scope':
-                                        self.logger.debug("processSecrurity: key=%s" % key)
+                                        self.logger.trace("processSecrurity: key=%s" % key)
                                         if AdminConfig.showAttribute(item, key) != v[key]:
-                                            self.logger.debug("processSecrurity: alias:%s, key=%s, actual=%s, config=%s" % (AdminConfig.showAttribute(item,'alias'), key, AdminConfig.showAttribute(item, key), v[key]))
+                                            self.logger.trace("processSecrurity: alias:%s, key=%s, actual=%s, config=%s" % (AdminConfig.showAttribute(item,'alias'), key, AdminConfig.showAttribute(item, key), v[key]))
                                             if self.action == 'W':
                                                 self.logger.info("processSecrurity: modifying %s:%s=%s" % (AdminConfig.showAttribute(item,'alias'), key, v[key]))
                                                 self.logger.debug("processSecrurity: command=AdminConfig.modify(%s, [[%s, %s]])" % (AdminConfig.showAttribute(item,'alias'), key, v[key]))
@@ -308,6 +311,20 @@ class ProcessCommands:
             raise ProcessCommandException("key and value parameters were not suppled to the method.")
         #end-if
 
+    def processAdminTask(self, k=None, v=None, c=None):
+        self.logger.trace("processAdminTask: key=%s, value=%s" % (k, v))
+        if k and v != None:
+            self.validateScope(valueDict=v, method='processAdminTask')
+            attrDict = self.convertAttributesToAdminTaskStep(k=k, v=v)
+            if k == 'SIBus':
+                self.processSIB(k=k, a=attrDict)
+            elif k == 'SIBusMember':
+                self.processSIBusMember(k=k, a=attrDict)
+        else:
+            self.logger.error("processPropertySet: key and value parameters were not suppled to the method.")
+            raise ProcessCommandException("key and value parameters were not suppled to the method.")
+        #end-if
+
     def validateScope(self, valueDict=None, method=None):
         self.valueDict=valueDict
         self.method=method
@@ -315,6 +332,66 @@ class ProcessCommands:
         if self.scope == "":
             self.logger.error("validateScope:%s Scope %s does not exist.  Check the scope in the configuration file." % (self.method, valueDict['scope']))
             raise ProcessCommandException("Scope %s does not exist.  Check the scope in the configuration file." % valueDict['scope'])
+
+    def convertAttributesToAdminTaskStep(self, k=None, v=None):
+        self.logger.trace("convertAttributesToAdminTaskStep: key=%s, value=%s" % (k, v))
+        attrDict = {}
+        for key, value in v.items():
+            if k == 'SIBus':
+                if key != 'scope':
+                    self.logger.trace("convertAttributesToAdminTaskStep: key=%s, value=%s" % (key, value))
+                    if key == 'name':
+                        self.logger.trace("convertAttributesToAdminTaskStep: converting attribute '%s' to AdminTask step '%s'" % (key, 'bus'))
+                        attrDict['bus'] = v[key]
+                    else:
+                        attrDict[key] = v[key]
+            elif k == 'SIBusMember':
+                if key == 'scope':
+                    self.logger.trace("convertAttributesToAdminTaskStep: converting attribute '%s' to AdminTask step '%s'" % (key, 'bus'))
+                    bus = value.split(':')
+                    self.logger.trace("convertAttributesToAdminTaskStep: bus=%s" % bus)
+                    bus = bus[1]
+                    self.logger.trace("convertAttributesToAdminTaskStep: bus=%s" % bus)
+                    bus = bus.split('/')
+                    self.logger.trace("convertAttributesToAdminTaskStep: bus=%s" % bus)
+                    bus = bus[0]
+                    self.logger.trace("convertAttributesToAdminTaskStep: bus=%s" % bus)
+                    attrDict['bus'] = bus
+                else:
+                    attrDict[key] = v[key]
+        self.logger.trace("convertAttributesToAdminTaskStep: attrDict=%s" % attrDict)
+        return attrDict
+
+    def processSIB(self, k=None, a=None):
+        attrDict=a
+        self.sib = AdminConfig.getid('/SIBus:%s/' % attrDict['bus'])
+        if self.sib != '':
+            for key in attrDict.keys():
+                self.logger.trace("processSIB: key=%s" % key)
+                if key != 'scope' and key != 'bus':
+                    self.value=AdminConfig.showAttribute(self.sib, key)
+                    self.logger.trace("processSIB: self.value=%s" % self.value)
+                    if self.value != attrDict[key]:
+                        if self.action == 'W':
+                            self.logger.info("processSIB: modifying %s:%s:%s=%s" % (k, AdminConfig.showAttribute(self.sib,'name'), key, attrDict[key]))
+                            self.logger.debug("processSIB: command=AdminTask.modifySIBus(%s)" % (["-%s %s -%s %s" % ('bus', attrDict['bus'], key, attrDict[key])]))
+                            AdminTask.modifySIBus(["-%s %s -%s %s" % ('bus', attrDict['bus'], key, attrDict[key])])
+                        else:
+                            self.logger.warn("processSIB: audit failure %s:%s, actual=%s config=%s" % (k, AdminConfig.showAttribute(self.sib,'name'), AdminConfig.showAttribute(self.sib, key), attrDict[key]))
+        else:
+            self.logger.info("processSIB: creating %s:%s" % (k, attrDict['bus']))
+            self.logger.debug("processSIB: command=AdminTask.createSIBus(%s)" % (["-%s %s" % (key, value) for key, value in attrDict.items()]))
+            AdminTask.createSIBus(["-%s %s" % (key, value) for key, value in attrDict.items()])
+
+    def processSIBusMember(self, k=None, a=None):
+        attrDict=a
+        self.sib = AdminConfig.getid('/SIBusMember:%s/' % attrDict['server'])
+        if self.sib != '':
+            self.logger.warn("processSIBusMember: server %s already member of the bus %s" % (attrDict['server'], attrDict['bus']))
+        else:
+            self.logger.info("processSIBusMember: creating %s:%s" % (k, attrDict['bus']))
+            self.logger.debug("processSIBusMember: command=AdminTask.addSIBusMember(%s)" % (["-%s %s" % (key, value) for key, value in attrDict.items()]))
+            AdminTask.addSIBusMember(["-%s %s" % (key, value) for key, value in attrDict.items()])
 
 class ProcessCommandException(Exception):
     """ General exception method for class. """

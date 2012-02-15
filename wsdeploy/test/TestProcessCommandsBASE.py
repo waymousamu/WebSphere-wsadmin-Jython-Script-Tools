@@ -85,6 +85,9 @@ class TestProcessCommandsBASE(unittest.TestCase):
         self.mqcf = AdminConfig.getid('/MQQueueConnectionFactory:DovetailJMSXAQueueConnectionFactory/')
         if self.mqcf != "":
             AdminConfig.remove(self.mqcf)
+        self.sib = AdminConfig.getid('/SIBus:DovetailSIBus/')
+        if self.sib != "":
+            AdminConfig.remove(self.sib)
 
     def testNoCommandsException(self):
         cmdDict = None
@@ -249,6 +252,42 @@ class TestProcessCommandsBASE(unittest.TestCase):
         self.jndiName=AdminConfig.showAttribute(self.mqq, 'jndiName')
         self.assertEqual(self.jndiName, 'dovetail/jms/AccountingHVMessageSendQueue')
 
+    def testSIBCreate(self):
+        self.cg.generateCommands(cmdList=[{'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01'}}], action='W')
+        self.sib = AdminConfig.getid('/SIBus:DovetailSIBus/')
+        self.name=AdminConfig.showAttribute(self.sib, 'name')
+        self.assertEqual(self.name, 'DovetailSIBus')
+
+    def testSIBModify(self):
+        self.cg.generateCommands(cmdList=[{'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description1'}}], action='W')
+        self.cg.generateCommands(cmdList=[{'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description2'}}], action='W')
+        self.sib = AdminConfig.getid('/SIBus:DovetailSIBus/')
+        self.description=AdminConfig.showAttribute(self.sib, 'description')
+        self.assertEqual(self.description, 'Description2')
+
+    def testSIBRead(self):
+        self.cg.generateCommands(cmdList=[{'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description1'}}], action='W')
+        self.cg.generateCommands(cmdList=[{'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description2'}}])
+        self.sib = AdminConfig.getid('/SIBus:DovetailSIBus/')
+        self.description=AdminConfig.showAttribute(self.sib, 'description')
+        self.assertEqual(self.description, 'Description1')
+
+    def testSIBBusMemberCreate(self):
+        self.cg.generateCommands(cmdList=[{'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description1'}}, {'SIBusMember' : {'scope' : '/SIBus:DovetailSIBus/', 'server' : 'srv01', 'node' : 'node01'}}], action='W')
+        self.sib = AdminConfig.getid('/SIBus:DovetailSIBus/')
+        self.name=AdminConfig.showAttribute(self.sib, 'name')
+        self.assertEqual(self.name, 'DovetailSIBus')
+
 if __name__ == '__main__' or __name__ == 'main':
-    suite = unittest.TestLoader().loadTestsFromTestCase(TestProcessCommandsBASE)
+
+    #test suite that runs individual tests: use this for speed and enable only the tests you are develop[ing for.
+    suite = unittest.TestSuite()
+    #suite.addTest(TestProcessCommandsBASE('testSIBCreate'))
+    #suite.addTest(TestProcessCommandsBASE('testSIBModify'))
+    #suite.addTest(TestProcessCommandsBASE('testSIBRead'))
+    suite.addTest(TestProcessCommandsBASE('testSIBBusMemberCreate'))
     unittest.TextTestRunner(verbosity=2).run(suite)
+
+    # Test suite to run everything.  Use this to sanity check all tests.
+    #suite = unittest.TestLoader().loadTestsFromTestCase(TestProcessCommandsBASE)
+    #unittest.TextTestRunner(verbosity=2).run(suite)

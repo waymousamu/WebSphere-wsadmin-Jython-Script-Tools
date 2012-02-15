@@ -17,13 +17,6 @@ CONFXML_ND = """
                 </Cell>
             </env>
             """
-CMDLIST_ND = [["Cell", {"name": "CCITstLP0ECell001"}],
-              ["dmgr", {"host": "10.152.30.16", "port": "10878"}],
-              ["AdminConfig.create('ServerCluster', (AdminConfig.getid('/Cell:CCITstLP0ECell001/')), '[[name CLTLPOEAts001]]')",
-              "AdminConfig.createClusterMember((AdminConfig.getid('/ServerCluster:CLTLPOEAts001/')), (AdminConfig.getid('/Node:X-CCITstLP0ENode001/')), [['memberName', 'X-CMTLPOEAtsSrv001']])",
-              "AdminConfig.createClusterMember((AdminConfig.getid('/ServerCluster:CLTLPOEAts001/')), (AdminConfig.getid('/Node:X-CCITstLP0ENode002/')), [['memberName', 'X-CMTLPOEAtsSrv002']])"]
-              ]
-
 CONFDICT_BASE = [
                  {'env': {'name': 'local'}},
                  {'Cell': {'name': 'HP8200SWaymouthNode01Cell'}},
@@ -44,7 +37,10 @@ CONFDICT_BASE = [
                  {'MQQueueConnectionFactory': {'transportType': 'BINDINGS_THEN_CLIENT', 'port': '1415', 'name': 'QCF1', 'scope': '/Cell:HP8200SWaymouthNode01Cell/', 'host': 'localhost', 'channel': 'CH1', 'queueManager': 'QMGR1', 'jndiName': 'jms/QCF1'}},
                  {'connectionPool': {'maxConnections': '200', 'scope': '/MQQueueConnectionFactory:QCF1/'}},
                  {'sessionPool': {'minConnections': '0', 'scope': '/MQQueueConnectionFactory:QCF1/'}},
-                 {'MQQueue' : {'name' : 'AccountingHVMessageSendQueue', 'jndiName' : 'dovetail/jms/AccountingHVMessageSendQueue', 'persistence' : 'PERSISTENT', 'baseQueueName' : 'AccountingHVMessageSendQueue', 'baseQueueManagerName' : 'QMGR1', 'queueManagerHost' : 'localhost', 'queueManagerPort' : '1415', 'serverConnectionChannelName' : 'CH1', 'scope': '/Cell:HP8200SWaymouthNode01Cell/'}}
+                 {'MQQueue' : {'name' : 'AccountingHVMessageSendQueue', 'jndiName' : 'dovetail/jms/AccountingHVMessageSendQueue', 'persistence' : 'PERSISTENT', 'baseQueueName' : 'AccountingHVMessageSendQueue', 'baseQueueManagerName' : 'QMGR1', 'queueManagerHost' : 'localhost', 'queueManagerPort' : '1415', 'serverConnectionChannelName' : 'CH1', 'scope': '/Cell:HP8200SWaymouthNode01Cell/'}},
+                 {'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:HP8200SWaymouthNode01Cell/'}},
+                 {'SIBusMember' : {'scope' : '/SIBus:DovetailSIBus/', 'server' : 'server1', 'node' : 'HP8200SWaymouthNode01'}},
+                 {'SIBTopicSpace' : {'identifier' : 'CacheUpdateTopic', 'topicAccessCheckRequired' : 'false', 'scope' : '/SIBus:DovetailSIBus/'}}
                  ]
 
 CONFXML_BASE = """
@@ -81,13 +77,10 @@ CONFXML_BASE = """
                         </J2EEResourcePropertySet>
                     </MQQueueConnectionFactory>
                     <MQQueue name="AccountingHVMessageSendQueue" jndiName="dovetail/jms/AccountingHVMessageSendQueue" persistence="PERSISTENT" baseQueueName="AccountingHVMessageSendQueue" baseQueueManagerName="QMGR1" queueManagerHost="localhost" queueManagerPort="1415" serverConnectionChannelName="CH1"/>
+                    <SIBus name="DovetailSIBus">
+                        <SIBusMember server="server1" node="HP8200SWaymouthNode01"/>
+                        <SIBTopicSpace identifier="CacheUpdateTopic" topicAccessCheckRequired="false" />
+                    </SIBus>
                 </Cell>
             </env>
             """
-CMDLIST_BASE = [["Cell", {"name": "HP8200SWaymouthNode01Cell"}],
-                ["dmgr", {"host": "localhost", "port": "8880"}],
-                ["AdminConfig.create('Server', (AdminConfig.getid('/Node:HP8200SWaymouthNode01/')), [['name', 'server1']])",
-                 "AdmionConfig.modify('')"
-                 "AdminConfig.create('JDBCProvider', (AdminConfig.getid('/Cell:HP8200SWaymouthNode01Cell/')), [['classpath', '${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar'], ['implementationClassName', 'oracle.jdbc.xa.client.OracleXADataSource'], ['name', 'XAEVPSJDBCProvider'], ['description', 'XAEVPSJDBCProvider'], ['providerType', 'Oracle JDBC Driver (XA)'], ['xa', 'true']])",
-                 "AdminConfig.create('DataSource', (AdminConfig.getid('/JDBCProvider:XAEVPSJDBCProvider/')), [['name', 'Q5DataSource'], ['datasourceHelperClassname', 'com.ibm.websphere.rsadapter.Oracle11gDataStoreHelper'], ['statementCacheSize', '600'], ['providerType', 'Oracle JDBC Driver (XA)'], ['jndiName', 'weblogic.jdbc.jts.Q5DataSource'], ['xaRecoveryAuthAlias', 'HP8200SWaymouthNode01/local_oracle_alias'], ['authDataAlias', 'HP8200SWaymouthNode01/local_oracle_alias'], ['description', 'Q5DataSource']])"]
-                ]
