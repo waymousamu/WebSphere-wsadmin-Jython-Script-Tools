@@ -111,17 +111,20 @@ class TestProcessConfigBASE(unittest.TestCase):
         self.xml = None
         shutil.rmtree(props['tmpPath'])
 
-    def testXMLReadConfig(self):
-        self.assertEqual(self.itemDict, self.pc.readConfig(xml=self.xml))
+#    def testXMLReadConfig(self):
+#        self.assertEqual(self.itemDict, self.pc.readConfig(xml=self.xml))
 
     def testXMLFileReadConfig(self):
-        fh = open(props['tmpPath'] + os.sep + 'env.xml','w')
-        fh.write(self.xml)
-        fh.close()
+        #fh = open(props['tmpPath'] + os.sep + 'env.xml','w')
+        #fh.write(self.xml)
+        #fh.close()
         #fh = open(props['tmpPath'] + os.sep + 'env.xml','r')
-        fhStr = props['tmpPath'] + os.sep + 'env.xml'
+        #fhStr = props['tmpPath'] + os.sep + 'env.xml'
+        #self.assertEqual(self.itemDict, self.pc.readConfig(fh=fhStr))
+        #fh.close()
+        fhStr = props['confPath'] + os.sep + 'sample.xml'
         self.assertEqual(self.itemDict, self.pc.readConfig(fh=fhStr))
-        fh.close()
+        #fh.close()
 
     def testXMLReadException(self):
         xml = None

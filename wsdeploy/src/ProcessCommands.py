@@ -15,6 +15,7 @@ class ProcessCommands:
     logger = Logger.getLogger("ProcessCommands")
 
     def generateCommands(self, cmdList=None, action=None):
+        '''Method that takes a list of commands and processes them'''
         self.action = action
         self.cmdList = cmdList
         self.logger.info("generateCommands: processing command dictionary.")
@@ -45,19 +46,10 @@ class ProcessCommands:
                         raise ProcessCommandException("Cell name %s != %s.  You may have connected to the wrong WebSphere environment or the name of the cell in the configuration xml is not correct." % (AdminControl.getCell(),v['name']))
                 elif k == "ServerCluster":
                     self.logger.trace("generateCommands: block = ServerCluster")
-                    scopeStr = ("AdminConfig.getid('%s')" % (v['scope']))
-                    clusterStr = ("'[[name %s]]'" % (v['name']))
-                    command = ("AdminConfig.create('%s', (%s), %s)" % (k, scopeStr, clusterStr))
-                    self.logger.trace("generateCommands: command = %s " % command)
-                    clusterCmdList.append(command)
+                    '''IMPLEMENT ME'''
                 elif re.search("ClusterMember", k):
                     self.logger.trace("generateCommands: block = ClusterMember")
-                    scopeStr = ("AdminConfig.getid('%s')" % (v['scope']))
-                    nodeStr = ("AdminConfig.getid('/Node:%s/')" % (v['nodeName']))
-                    clusterMemberName = ("[['memberName', '%s']]" % (v['memberName']))
-                    command = ("AdminConfig.createClusterMember((%s), (%s), %s)" % (scopeStr, nodeStr, clusterMemberName))
-                    self.logger.trace("generateCommands: command = %s " % command)
-                    clusterMemberCmdlist.append(command)
+                    '''IMPLEMENT ME'''
                 elif k == "Server":
                     self.logger.trace("generateCommands: block = Server")
                     self.processServer(k=k, v=v)
@@ -101,21 +93,20 @@ class ProcessCommands:
                 else:
                     '''Throw an exception if the tag is unknown'''
                     self.logger.error("generateCommands: %s is an unknown key, it will be ignored." % k)
-                    raise ProcessCommandException("%s is an unknown key, it will be ignored." % k)
 
     def processServer(self, k=None, v=None):
         self.logger.debug("processServer: key=%s, value=%s" % (k, v))
         if k and v != None:
             self.validateScope(v, 'processServer')
             srv = AdminConfig.getid(v['scope']+"%s:%s/" % (k, v['name']))
-            self.logger.debug("processServer: srv=%s " % srv)
+            self.logger.trace("processServer: srv=%s " % srv)
             if srv == "":
                 self.logger.info("processServer: creating server %s" % v['name'])
             else:
                 srvObj = AdminConfig.getObjectName(srv)
-                self.logger.debug("processServer: srvObj %s" % srvObj)
+                self.logger.trace("processServer: srvObj %s" % srvObj)
                 ptype = AdminControl.getAttribute(srvObj, 'processType')
-                self.logger.debug("processServer: ptype %s" % ptype)
+                self.logger.trace("processServer: ptype %s" % ptype)
                 if ptype != 'UnManagedProcess':
                     self.logger.info("processServer: This is a Network Deployment Profile so this command will run.")
                 else:
@@ -129,16 +120,16 @@ class ProcessCommands:
         #end-if
 
     def processNestedAttribute(self, k=None, v=None):
-        self.logger.debug("processNestedAttribute: key=%s, value=%s" % (k, v))
+        self.logger.trace("processNestedAttribute: key=%s, value=%s" % (k, v))
         if k and v != None:
             self.validateScope(v, 'processNestedAttribute')
             attribute = None
             if re.match("[a-z]", k):
-                self.logger.debug("processNestedAttribute: %s is a nested property." % k)
+                self.logger.trace("processNestedAttribute: %s is a nested property." % k)
                 attribute=AdminConfig.showAttribute(AdminConfig.getid(v['scope']), k)
             else:
                 attribute = AdminConfig.list('%s' % k, AdminConfig.getid(v['scope']))
-                self.logger.debug("processNestedAttribute: %s is an object." % k)
+                self.logger.trace("processNestedAttribute: %s is an object." % k)
             for (k2, v2) in v.items():
                 if k2 != "scope":
                     actualValue=AdminConfig.showAttribute(attribute, k2)
@@ -161,12 +152,12 @@ class ProcessCommands:
         #end-if
 
     def processConfigItem(self, k=None, v=None, t=None):
-        self.logger.debug("processConfigItem: key=%s, value=%s" % (k, v))
+        self.logger.trace("processConfigItem: key=%s, value=%s" % (k, v))
         if k and v != None:
             self.validateScope(v, 'processConfigItem')
-            self.logger.debug("processConfigItem: scope=%s " % AdminConfig.getid(v['scope']))
+            self.logger.trace("processConfigItem: scope=%s " % AdminConfig.getid(v['scope']))
             obj = AdminConfig.getid('%s%s:%s' % (v['scope'], k, v['name']))
-            self.logger.debug("processConfigItem: obj=%s " % obj)
+            self.logger.trace("processConfigItem: obj=%s " % obj)
             if obj == "":
                 attrList = []
                 for key in v.keys():
@@ -174,7 +165,7 @@ class ProcessCommands:
                         attrList.append([key, v[key]])
                     #end-if
                 #end-for
-                self.logger.debug("processConfigItem: attrList=%s" % attrList)
+                self.logger.trace("processConfigItem: attrList=%s" % attrList)
                 if t == None:
                     if self.action == 'W':
                         self.logger.info("processConfigItem: creating %s:%s:%s" % (AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'name'), k, v['name']))
@@ -191,14 +182,13 @@ class ProcessCommands:
                 #end-if
             #end-if
             else:
-                self.logger.debug("processConfigItem: need to add the modify code here :-)")
                 for key in v.keys():
                     if key != 'scope':
                         actual = AdminConfig.showAttribute(obj, key)
-                        self.logger.debug("processConfigItem: attribute=%s, value=%s" % (key, actual))
+                        self.logger.trace("processConfigItem: attribute=%s, value=%s" % (key, actual))
                         if actual != v[key]:
                             if self.action == 'W':
-                                self.logger.debug("processConfigItem: updating actual=%s to %s" % (actual,v[key]))
+                                self.logger.info("processConfigItem: updating actual=%s to %s" % (actual,v[key]))
                                 self.logger.debug("processConfigItem: command=AdminConfig.modify(%s, [['%s', '%s']])" % (obj, key, v[key]))
                                 AdminConfig.modify(obj, [[key, v[key]]])
                             else:
@@ -215,21 +205,21 @@ class ProcessCommands:
 
     def processPropertySet(self, k=None, v=None):
         '''Used to process property sets such as J2EEResourceProperties'''
-        self.logger.debug("processPropertySet: key=%s, value=%s" % (k, v))
+        self.logger.trace("processPropertySet: key=%s, value=%s" % (k, v))
         if k and v != None:
             self.validateScope(v, 'processPropertySet')
             self.propSet=AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'propertySet')
-            self.logger.debug("processPropertySet: propSet=%s " % self.propSet)
+            self.logger.trace("processPropertySet: propSet=%s " % self.propSet)
             self.propList = AdminConfig.list(k, AdminConfig.getid(v['scope'])).split('\r\n')
             for key in v.keys():
                 if key == 'name':
-                    self.logger.debug("processPropertySet: key=%s, value=%s" % (key, v[key]))
+                    self.logger.trace("processPropertySet: key=%s, value=%s" % (key, v[key]))
                     itemFound="1"
                     for item in self.propList:
-                        self.logger.debug("processPropertySet: name=%s" % AdminConfig.showAttribute(item, 'name'))
+                        self.logger.trace("processPropertySet: name=%s" % AdminConfig.showAttribute(item, 'name'))
                         if AdminConfig.showAttribute(item, 'name') == v[key]:
-                            self.logger.debug("processPropertySet: actual name=%s, value=%s" % (AdminConfig.showAttribute(item, 'name'), AdminConfig.showAttribute(item, 'value')))
-                            self.logger.debug("processPropertySet: config name=%s, value=%s" % (v['name'], v['value']))
+                            self.logger.trace("processPropertySet: actual name=%s, value=%s" % (AdminConfig.showAttribute(item, 'name'), AdminConfig.showAttribute(item, 'value')))
+                            self.logger.trace("processPropertySet: config name=%s, value=%s" % (v['name'], v['value']))
                             if AdminConfig.showAttribute(item, 'value') != v['value']:
                                 if self.action == 'W':
                                     self.logger.info("processPropertySet: modifying %s:%s:%s=%s" % (AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'name'), AdminConfig.showAttribute(item, 'name'), 'value', v['value']))

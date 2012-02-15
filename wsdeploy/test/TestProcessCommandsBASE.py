@@ -98,15 +98,6 @@ class TestProcessCommandsBASE(unittest.TestCase):
         else:
             fail("Expected an Exception")
 
-    def testBogusKeyException(self):
-        cmdDict = {'boguskey': 'bogusvalue'}
-        try:
-            self.cg.generateCommands(cmdDict)
-        except Exception:
-            pass
-        else:
-            fail("Expected an Exception")
-
     def testCellCheck(self):
         try:
             self.cg.generateCommands(cmdList=[{'Cell': {'name': 'HP8200SWaymouthNode01Cell'}}])
@@ -281,13 +272,13 @@ class TestProcessCommandsBASE(unittest.TestCase):
 if __name__ == '__main__' or __name__ == 'main':
 
     #test suite that runs individual tests: use this for speed and enable only the tests you are develop[ing for.
-    suite = unittest.TestSuite()
+    #suite = unittest.TestSuite()
     #suite.addTest(TestProcessCommandsBASE('testSIBCreate'))
     #suite.addTest(TestProcessCommandsBASE('testSIBModify'))
     #suite.addTest(TestProcessCommandsBASE('testSIBRead'))
-    suite.addTest(TestProcessCommandsBASE('testSIBBusMemberCreate'))
-    unittest.TextTestRunner(verbosity=2).run(suite)
-
-    # Test suite to run everything.  Use this to sanity check all tests.
-    #suite = unittest.TestLoader().loadTestsFromTestCase(TestProcessCommandsBASE)
+    #suite.addTest(TestProcessCommandsBASE('testSIBBusMemberCreate'))
     #unittest.TextTestRunner(verbosity=2).run(suite)
+
+    #Test suite to run everything.  Use this to sanity check all tests.
+    suite = unittest.TestLoader().loadTestsFromTestCase(TestProcessCommandsBASE)
+    unittest.TextTestRunner(verbosity=2).run(suite)

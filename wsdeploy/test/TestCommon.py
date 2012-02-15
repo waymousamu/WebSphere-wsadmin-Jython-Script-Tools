@@ -18,29 +18,28 @@ CONFXML_ND = """
             </env>
             """
 CONFDICT_BASE = [
-                 {'env': {'name': 'local'}},
-                 {'Cell': {'name': 'HP8200SWaymouthNode01Cell'}},
-                 {'JAASAuthData': {'alias': 'local_oracle_alias', 'userId': 'swaymouth', 'password': 'secret', 'scope': '/Cell:HP8200SWaymouthNode01Cell/'}},
-                 {'dmgr': {'port': '8880', 'host': 'localhost'}},
-                 {'Node': {'scope': '/Cell:HP8200SWaymouthNode01Cell/', 'name': 'HP8200SWaymouthNode01'}},
-                 {'Server': {'scope': '/Node:HP8200SWaymouthNode01/', 'name': 'server1'}},
-                 {'ProcessExecution': {'runAsUser': 'wasadmin', 'runAsGroup': 'wasadmin', 'scope': '/Server:server1/'}},
-                 {'JavaVirtualMachine': {'scope': '/Server:server1/', 'genericJvmArguments': '-Dlog4j.root=WAS_HOME', 'maximumHeapSize': '512', 'initialHeapSize': '256'}},
-                 {'JDBCProvider': {'name': 'XAEVPSJDBCProvider', 'implementationClassName': 'oracle.jdbc.xa.client.OracleXADataSource', 'scope': '/Cell:HP8200SWaymouthNode01Cell/', 'description': 'XAEVPSJDBCProvider', 'providerType': 'Oracle JDBC Driver (XA)', 'xa': 'true', 'classpath': '${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar'}},
-                 {'DataSource': {'name': 'Q5DataSource', 'datasourceHelperClassname': 'com.ibm.websphere.rsadapter.Oracle11gDataStoreHelper', 'statementCacheSize': '600', 'providerType': 'Oracle JDBC Driver (XA)', 'jndiName': 'weblogic.jdbc.jts.Q5DataSource', 'xaRecoveryAuthAlias': 'HP8200SWaymouthNode01/local_oracle_alias', 'authDataAlias': 'HP8200SWaymouthNode01/local_oracle_alias', 'description': 'Q5DataSource', 'scope': '/JDBCProvider:XAEVPSJDBCProvider/'}},
+                 {'env': {'name': 'altus3400_Base'}},
+                 {'Cell': {'name': 'cell01'}},
+                 {'JAASAuthData': {'password': '{xor}LDo8LTor', 'userId': 'swaymouth', 'alias': 'dps_oracle_alias', 'scope': '/Cell:cell01/'}},
+                 {'dmgr': {'port': '8880', 'host': 'altus3400.dovetail.net'}}, {'Node': {'name': 'node01', 'scope': '/Cell:cell01/'}},
+                 {'Server': {'name': 'srv01', 'scope': '/Node:node01/'}},
+                 {'ProcessExecution': {'runAsUser': 'websphere', 'runAsGroup': 'websphere', 'scope': '/Server:srv01/'}},
+                 {'JavaVirtualMachine': {'scope': '/Server:srv01/', 'genericJvmArguments': '-Xlp', 'maximumHeapSize': '2048', 'initialHeapSize': '1024'}},
+                 {'JDBCProvider': {'classpath': '${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar', 'name': 'XAEVPSJDBCProvider', 'implementationClassName': 'oracle.jdbc.xa.client.OracleXADataSource', 'scope': '/Cell:cell01/', 'description': 'XAEVPSJDBCProvider', 'providerType': 'Oracle JDBC Driver (XA)', 'xa': 'true'}},
+                 {'DataSource': {'name': 'Q5DataSource', 'datasourceHelperClassname': 'com.ibm.websphere.rsadapter.Oracle11gDataStoreHelper', 'statementCacheSize': '600', 'providerType': 'Oracle JDBC Driver (XA)', 'jndiName': 'weblogic.jdbc.jts.Q5DataSource', 'xaRecoveryAuthAlias': 'node01/dps_oracle_alias', 'authDataAlias': 'node01/dps_oracle_alias', 'description': 'Q5DataSource', 'scope': '/JDBCProvider:XAEVPSJDBCProvider/'}},
                  {'J2EEResourceProperty': {'name': 'useRRASetEquals', 'scope': '/DataSource:Q5DataSource/', 'type': 'java.lang.String', 'value': 'true', 'required': 'false'}},
                  {'J2EEResourceProperty': {'name': 'transactionBranchesLooselyCoupled', 'scope': '/DataSource:Q5DataSource/', 'type': 'java.lang.Boolean', 'value': 'true'}},
                  {'J2EEResourceProperty': {'name': 'validateNewConnection', 'scope': '/DataSource:Q5DataSource/', 'type': 'java.lang.Boolean', 'value': 'true'}},
                  {'J2EEResourceProperty': {'name': 'validateNewConnectionRetryCount', 'scope': '/DataSource:Q5DataSource/', 'type': 'java.lang.Integer', 'value': '5'}},
                  {'J2EEResourceProperty': {'name': 'validateNewConnectionRetryInterval', 'scope': '/DataSource:Q5DataSource/', 'type': 'java.lang.Long', 'value': '5'}},
                  {'ConnectionPool': {'maxConnections': '1000', 'scope': '/DataSource:Q5DataSource/', 'testConnectionInterval': '3', 'minConnections': '5', 'testConnection': 'true'}},
-                 {'MQQueueConnectionFactory': {'transportType': 'BINDINGS_THEN_CLIENT', 'port': '1415', 'name': 'QCF1', 'scope': '/Cell:HP8200SWaymouthNode01Cell/', 'host': 'localhost', 'channel': 'CH1', 'queueManager': 'QMGR1', 'jndiName': 'jms/QCF1'}},
+                 {'MQQueueConnectionFactory': {'transportType': 'BINDINGS_THEN_CLIENT', 'port': '1414', 'name': 'QCF1', 'scope': '/Cell:cell01/', 'host': 'localhost', 'channel': 'CH1', 'queueManager': 'QM1', 'jndiName': 'jms/QCF1'}},
                  {'connectionPool': {'maxConnections': '200', 'scope': '/MQQueueConnectionFactory:QCF1/'}},
-                 {'sessionPool': {'minConnections': '0', 'scope': '/MQQueueConnectionFactory:QCF1/'}},
-                 {'MQQueue' : {'name' : 'AccountingHVMessageSendQueue', 'jndiName' : 'dovetail/jms/AccountingHVMessageSendQueue', 'persistence' : 'PERSISTENT', 'baseQueueName' : 'AccountingHVMessageSendQueue', 'baseQueueManagerName' : 'QMGR1', 'queueManagerHost' : 'localhost', 'queueManagerPort' : '1415', 'serverConnectionChannelName' : 'CH1', 'scope': '/Cell:HP8200SWaymouthNode01Cell/'}},
-                 {'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:HP8200SWaymouthNode01Cell/'}},
-                 {'SIBusMember' : {'scope' : '/SIBus:DovetailSIBus/', 'server' : 'server1', 'node' : 'HP8200SWaymouthNode01'}},
-                 {'SIBTopicSpace' : {'identifier' : 'CacheUpdateTopic', 'topicAccessCheckRequired' : 'false', 'scope' : '/SIBus:DovetailSIBus/'}}
+                 {'sessionPool': {'scope': '/MQQueueConnectionFactory:QCF1/', 'minConnections': '0'}},
+                 {'MQQueue': {'name': 'AccountingHVMessageSendQueue', 'baseQueueName': 'AccountingHVMessageSendQueue', 'serverConnectionChannelName': 'CH1', 'baseQueueManagerName': 'QM1', 'jndiName': 'dovetail/jms/AccountingHVMessageSendQueue', 'queueManagerHost': 'localhost', 'persistence': 'PERSISTENT', 'scope': '/Cell:cell01/', 'queueManagerPort': '1414'}},
+                 {'SIBus': {'name': 'DovetailSIBus', 'scope': '/Cell:cell01/'}},
+                 {'SIBusMember': {'scope': '/SIBus:DovetailSIBus/', 'node': 'node01', 'server': 'srv01'}},
+                 {'SIBTopicSpace': {'identifier': 'CacheUpdateTopic', 'scope': '/SIBus:DovetailSIBus/', 'topicAccessCheckRequired': 'false'}}
                  ]
 
 CONFXML_BASE = """
