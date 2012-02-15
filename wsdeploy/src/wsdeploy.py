@@ -42,7 +42,6 @@ props['jythonpath'] = jythonpath
 props['srcPath'] = srcPath
 props['testPath'] = testPath
 #print props
-from optparse import OptionParser
 
 '''import the wsdeploy modules'''
 from ProcessConfig import *
