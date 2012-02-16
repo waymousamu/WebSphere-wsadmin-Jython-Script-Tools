@@ -59,7 +59,7 @@ class TestProcessCommandsBASE(unittest.TestCase):
 
     def setUp(self):
         self.cg = ProcessCommands()
-        self.itemDict = CONFDICT_BASE
+        self.itemList = CONFDICT_BASE
         self.srv = AdminConfig.getid('/Server:srv01/')
         self.pe = AdminConfig.list('ProcessExecution', self.srv)
         AdminConfig.modify(self.pe, [['runAsUser', 'websphere']])
@@ -82,7 +82,7 @@ class TestProcessCommandsBASE(unittest.TestCase):
             if item != '':
                 if AdminConfig.showAttribute(item, 'alias') == 'local_oracle_alias':
                     AdminConfig.remove(item)
-        self.mqcf = AdminConfig.getid('/MQQueueConnectionFactory:DovetailJMSXAQueueConnectionFactory/')
+        self.mqcf = AdminConfig.getid('/MQQueueConnectionFactory:QCF1/')
         if self.mqcf != "":
             AdminConfig.remove(self.mqcf)
         self.sib = AdminConfig.getid('/SIBus:DovetailSIBus/')
@@ -90,53 +90,80 @@ class TestProcessCommandsBASE(unittest.TestCase):
             AdminConfig.remove(self.sib)
 
     def testNoCommandsException(self):
-        cmdDict = None
+        cmdList = None
         try:
-            self.cg.generateCommands(cmdDict)
-        except Exception:
+            self.cg.generateCommands(cmdList)
+        except ProcessCommandException:
             pass
         else:
-            fail("Expected an Exception")
+            self.assertEquals(0,1, "This should have thrown an exception.")
 
-    def testCellCheck(self):
+    def testCellCheckException(self):
         try:
             self.cg.generateCommands(cmdList=[{'Cell': {'name': 'HP8200SWaymouthNode01Cell'}}])
-        except Exception:
+        except ProcessCommandException:
             pass
         else:
-            fail("Expected an Exception")
+            self.assertEquals(0,1, "This should have thrown an exception.")
 
-    def testBogusScope(self):
+    def testBogusScopeException(self):
         try:
-            self.cg.generateCommands(cmdList=[{'ProcessExecution': {'runAsUser': 'wasadmin', 'runAsGroup': 'wasadmin', 'scope': '/Server:BogusServer1/'}}])
-        except Exception:
+            self.cg.validateScope(valueDict={'runAsUser': 'wasadmin', 'runAsGroup': 'wasadmin', 'scope': '/Server:BogusScope01/'}, method='testBogusScope')
+        except ProcessCommandException:
             pass
         else:
-            fail("Expected an Exception")
+            self.assertEquals(0,1, "This should have thrown an exception.")
+
+    def testGenerateCommandsBadKeyException(self):
+        try:
+            self.cg.generateCommands(cmdList=[{'BogusKey': {'attr': 'value'}}])
+        except ProcessCommandException:
+            pass
+        else:
+            self.assertEquals(0,1, "This should have thrown an exception.")
+
+    def testGenerateCommands(self):
+        '''This verifies that the configuration list contains valid dictionaries'''
+        try:
+            self.cg.generateCommands(cmdList=self.itemList, action='W')
+        except ProcessCommandException:
+            self.assertEquals(0,1, "This should not have thrown an exception.")
+        else:
+            pass
+
+    def testGenerateCommandsException(self):
+        '''This verifies that an exception is created when the generateCommand method is run in read only mode and objects do not yet exist'''
+        try:
+            self.cg.generateCommands(cmdList=self.itemList)
+        except ProcessCommandException:
+            pass
+        else:
+            self.assertEquals(0,1, "This should not have thrown an exception.")
+
 
     def testProcessConfigItemCreate(self):
-        self.cg.generateCommands(cmdList=[{'JDBCProvider': {'name': 'XAEVPSJDBCProvider', 'implementationClassName': 'oracle.jdbc.xa.client.OracleXADataSource', 'scope': '/Cell:cell01/', 'description': 'XAEVPSJDBCProvider', 'providerType': 'Oracle JDBC Driver (XA)', 'xa': 'true', 'classpath': '${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar'}}], action='W')
+        self.cg.processConfigItem(cmdDict={'JDBCProvider': {'name': 'XAEVPSJDBCProvider', 'implementationClassName': 'oracle.jdbc.xa.client.OracleXADataSource', 'scope': '/Cell:cell01/', 'description': 'XAEVPSJDBCProvider', 'providerType': 'Oracle JDBC Driver (XA)', 'xa': 'true', 'classpath': '${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar'}}, action='W')
         self.jdbcprov = AdminConfig.getid('/JDBCProvider:XAEVPSJDBCProvider/')
         self.implementationClassName=AdminConfig.showAttribute(self.jdbcprov, 'implementationClassName')
         self.assertEqual(self.implementationClassName, 'oracle.jdbc.xa.client.OracleXADataSource')
 
     def testProcessConfigItemModify(self):
-        self.cg.generateCommands(cmdList=[{'JDBCProvider': {'name': 'XAEVPSJDBCProvider', 'implementationClassName': 'oracle.jdbc.xa.client.OracleXADataSource', 'scope': '/Cell:cell01/', 'description': 'XAEVPSJDBCProvider', 'providerType': 'Oracle JDBC Driver (XA)', 'xa': 'true', 'classpath': '${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar'}}], action='W')
-        self.cg.generateCommands(cmdList=[{'JDBCProvider': {'name': 'XAEVPSJDBCProvider', 'implementationClassName': 'oracle.jdbc.xa.client.OracleXADataSource', 'scope': '/Cell:cell01/', 'description': 'XAEVPSJDBCProvider', 'providerType': 'Oracle JDBC Driver (XA)', 'xa': 'false', 'classpath': '${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar'}}], action='W')
+        self.cg.processConfigItem(cmdDict={'JDBCProvider': {'name': 'XAEVPSJDBCProvider', 'implementationClassName': 'oracle.jdbc.xa.client.OracleXADataSource', 'scope': '/Cell:cell01/', 'description': 'XAEVPSJDBCProvider', 'providerType': 'Oracle JDBC Driver (XA)', 'xa': 'true', 'classpath': '${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar'}}, action='W')
+        self.cg.processConfigItem(cmdDict={'JDBCProvider': {'name': 'XAEVPSJDBCProvider', 'implementationClassName': 'oracle.jdbc.xa.client.OracleXADataSource', 'scope': '/Cell:cell01/', 'description': 'XAEVPSJDBCProvider', 'providerType': 'Oracle JDBC Driver (XA)', 'xa': 'false', 'classpath': '${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar'}}, action='W')
         self.jdbcprov = AdminConfig.getid('/JDBCProvider:XAEVPSJDBCProvider/')
         self.implementationClassName=AdminConfig.showAttribute(self.jdbcprov, 'xa')
         self.assertEqual(self.implementationClassName, 'false')
 
     def testProcessConfigItemRead(self):
-        self.cg.generateCommands(cmdList=[{'JDBCProvider': {'name': 'XAEVPSJDBCProvider', 'implementationClassName': 'oracle.jdbc.xa.client.OracleXADataSource', 'scope': '/Cell:cell01/', 'description': 'XAEVPSJDBCProvider', 'providerType': 'Oracle JDBC Driver (XA)', 'xa': 'true', 'classpath': '${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar'}}], action='W')
-        self.cg.generateCommands(cmdList=[{'JDBCProvider': {'name': 'XAEVPSJDBCProvider', 'implementationClassName': 'oracle.jdbc.xa.client.OracleXADataSource', 'scope': '/Cell:cell01/', 'description': 'XAEVPSJDBCProvider', 'providerType': 'Oracle JDBC Driver (XA)', 'xa': 'false', 'classpath': '${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar'}}])
+        self.cg.processConfigItem(cmdDict={'JDBCProvider': {'name': 'XAEVPSJDBCProvider', 'implementationClassName': 'oracle.jdbc.xa.client.OracleXADataSource', 'scope': '/Cell:cell01/', 'description': 'XAEVPSJDBCProvider', 'providerType': 'Oracle JDBC Driver (XA)', 'xa': 'true', 'classpath': '${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar'}}, action='W')
+        self.cg.processConfigItem(cmdDict={'JDBCProvider': {'name': 'XAEVPSJDBCProvider', 'implementationClassName': 'oracle.jdbc.xa.client.OracleXADataSource', 'scope': '/Cell:cell01/', 'description': 'XAEVPSJDBCProvider', 'providerType': 'Oracle JDBC Driver (XA)', 'xa': 'false', 'classpath': '${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar'}})
         self.jdbcprov = AdminConfig.getid('/JDBCProvider:XAEVPSJDBCProvider/')
         self.implementationClassName=AdminConfig.showAttribute(self.jdbcprov, 'xa')
         self.assertEqual(self.implementationClassName, 'true')
         pass
 
     def testProcessNestedAttributeModify(self):
-        self.cg.generateCommands(cmdList=[{'ProcessExecution': {'runAsUser': 'wasadmin', 'runAsGroup': 'wasadmin', 'scope': '/Server:srv01/'}}], action='W')
+        self.cg.processNestedAttribute(cmdDict={'ProcessExecution': {'runAsUser': 'wasadmin', 'runAsGroup': 'wasadmin', 'scope': '/Server:srv01/'}}, action='W')
         self.srv = AdminConfig.getid('/Server:srv01/')
         self.pe = AdminConfig.list('ProcessExecution', self.srv)
         self.runAsUser=AdminConfig.showAttribute(self.pe, 'runAsUser')
@@ -145,7 +172,7 @@ class TestProcessCommandsBASE(unittest.TestCase):
         self.assertEqual(self.runAsGroup, 'wasadmin')
 
     def testProcessNestedAttributeRead(self):
-        self.cg.generateCommands(cmdList=[{'JavaVirtualMachine': {'scope': '/Server:srv01/', 'genericJvmArguments': '-Dlog4j.root=WAS_HOME', 'maximumHeapSize': '512', 'initialHeapSize': '256'}}], action='R')
+        self.cg.processNestedAttribute(cmdDict={'JavaVirtualMachine': {'scope': '/Server:srv01/', 'genericJvmArguments': '-Dlog4j.root=WAS_HOME', 'maximumHeapSize': '512', 'initialHeapSize': '256'}}, action='R')
         self.srv = AdminConfig.getid('/Server:srv01/')
         self.jvm = AdminConfig.list('JavaVirtualMachine', self.srv)
         self.maximumHeapSize=AdminConfig.showAttribute(self.jvm, 'maximumHeapSize')
@@ -153,132 +180,158 @@ class TestProcessCommandsBASE(unittest.TestCase):
         self.assertEqual(self.maximumHeapSize, '0')
         self.assertEqual(self.initialHeapSize, '0')
 
-    def testProcessPropertySetModify(self):
-        self.cg.generateCommands(cmdList=[{'JDBCProvider': {'name': 'XAEVPSJDBCProvider', 'implementationClassName': 'oracle.jdbc.xa.client.OracleXADataSource', 'scope': '/Cell:cell01/', 'description': 'XAEVPSJDBCProvider', 'providerType': 'Oracle JDBC Driver (XA)', 'xa': 'true', 'classpath': '${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar'}}], action='W')
-        self.cg.generateCommands(cmdList=[{'DataSource': {'name': 'Q5DataSource', 'datasourceHelperClassname': 'com.ibm.websphere.rsadapter.Oracle11gDataStoreHelper', 'statementCacheSize': '600', 'providerType': 'Oracle JDBC Driver (XA)', 'jndiName': 'weblogic.jdbc.jts.Q5DataSource', 'xaRecoveryAuthAlias': 'HP8200SWaymouthNode01/local_oracle_alias', 'authDataAlias': 'HP8200SWaymouthNode01/local_oracle_alias', 'description': 'Q5DataSource', 'scope': '/JDBCProvider:XAEVPSJDBCProvider/'}}], action='W')
-        self.cg.generateCommands(cmdList=[{'J2EEResourceProperty': {'name': 'useRRASetEquals', 'scope': '/DataSource:Q5DataSource/', 'type': 'java.lang.String', 'value': 'true', 'required': 'false'}}, {'J2EEResourceProperty': {'name': 'transactionBranchesLooselyCoupled', 'scope': '/DataSource:Q5DataSource/', 'type': 'java.lang.Boolean', 'value': 'true'}}], action='W')
+    def testProcessPropertySetCreate(self):
+        self.cg.processConfigItem(cmdDict={'JDBCProvider': {'name': 'XAEVPSJDBCProvider', 'implementationClassName': 'oracle.jdbc.xa.client.OracleXADataSource', 'scope': '/Cell:cell01/', 'description': 'XAEVPSJDBCProvider', 'providerType': 'Oracle JDBC Driver (XA)', 'xa': 'true', 'classpath': '${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar'}}, action='W')
+        self.cg.processConfigItem(cmdDict={'DataSource': {'name': 'Q5DataSource', 'datasourceHelperClassname': 'com.ibm.websphere.rsadapter.Oracle11gDataStoreHelper', 'statementCacheSize': '600', 'providerType': 'Oracle JDBC Driver (XA)', 'jndiName': 'weblogic.jdbc.jts.Q5DataSource', 'xaRecoveryAuthAlias': 'HP8200SWaymouthNode01/local_oracle_alias', 'authDataAlias': 'HP8200SWaymouthNode01/local_oracle_alias', 'description': 'Q5DataSource', 'scope': '/JDBCProvider:XAEVPSJDBCProvider/'}}, action='W')
+        self.cg.processPropertySet(cmdDict={'J2EEResourceProperty': {'name': 'useRRASetEquals', 'scope': '/DataSource:Q5DataSource/', 'type': 'java.lang.String', 'value': 'true', 'required': 'false'}}, action='W')
         self.datasource = AdminConfig.getid('/DataSource:Q5DataSource/')
         self.j2eerespropList = AdminConfig.list('J2EEResourceProperty', self.datasource).split('\r\n')
         for item in self.j2eerespropList:
             if AdminConfig.showAttribute(item, 'name') == 'useRRASetEquals':
                 self.assertEqual(AdminConfig.showAttribute(item, 'value'), 'true')
+
+    def testProcessPropertySetModify(self):
+        self.cg.processConfigItem(cmdDict={'JDBCProvider': {'name': 'XAEVPSJDBCProvider', 'implementationClassName': 'oracle.jdbc.xa.client.OracleXADataSource', 'scope': '/Cell:cell01/', 'description': 'XAEVPSJDBCProvider', 'providerType': 'Oracle JDBC Driver (XA)', 'xa': 'true', 'classpath': '${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar'}}, action='W')
+        self.cg.processConfigItem(cmdDict={'DataSource': {'name': 'Q5DataSource', 'datasourceHelperClassname': 'com.ibm.websphere.rsadapter.Oracle11gDataStoreHelper', 'statementCacheSize': '600', 'providerType': 'Oracle JDBC Driver (XA)', 'jndiName': 'weblogic.jdbc.jts.Q5DataSource', 'xaRecoveryAuthAlias': 'HP8200SWaymouthNode01/local_oracle_alias', 'authDataAlias': 'HP8200SWaymouthNode01/local_oracle_alias', 'description': 'Q5DataSource', 'scope': '/JDBCProvider:XAEVPSJDBCProvider/'}}, action='W')
+        self.cg.processPropertySet(cmdDict={'J2EEResourceProperty': {'name': 'transactionBranchesLooselyCoupled', 'scope': '/DataSource:Q5DataSource/', 'type': 'java.lang.Boolean', 'value': 'true'}}, action='W')
+        self.datasource = AdminConfig.getid('/DataSource:Q5DataSource/')
+        self.j2eerespropList = AdminConfig.list('J2EEResourceProperty', self.datasource).split('\r\n')
+        for item in self.j2eerespropList:
             if AdminConfig.showAttribute(item, 'name') == 'transactionBranchesLooselyCoupled':
                 self.assertEqual(AdminConfig.showAttribute(item, 'value'), 'true')
 
     def testProcessPropertySetRead(self):
-        self.cg.generateCommands(cmdList=[{'JDBCProvider': {'name': 'XAEVPSJDBCProvider', 'implementationClassName': 'oracle.jdbc.xa.client.OracleXADataSource', 'scope': '/Cell:cell01/', 'description': 'XAEVPSJDBCProvider', 'providerType': 'Oracle JDBC Driver (XA)', 'xa': 'true', 'classpath': '${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar'}}], action='W')
-        self.cg.generateCommands(cmdList=[{'DataSource': {'name': 'Q5DataSource', 'datasourceHelperClassname': 'com.ibm.websphere.rsadapter.Oracle11gDataStoreHelper', 'statementCacheSize': '600', 'providerType': 'Oracle JDBC Driver (XA)', 'jndiName': 'weblogic.jdbc.jts.Q5DataSource', 'xaRecoveryAuthAlias': 'HP8200SWaymouthNode01/local_oracle_alias', 'authDataAlias': 'HP8200SWaymouthNode01/local_oracle_alias', 'description': 'Q5DataSource', 'scope': '/JDBCProvider:XAEVPSJDBCProvider/'}}], action='W')
-        self.cg.generateCommands(cmdList=[{'ConnectionPool': {'maxConnections': '1000', 'scope': '/DataSource:Q5DataSource/', 'testConnectionInterval': '3', 'minConnections': '5', 'testConnection': 'true'}}])
+        self.cg.processConfigItem(cmdDict={'JDBCProvider': {'name': 'XAEVPSJDBCProvider', 'implementationClassName': 'oracle.jdbc.xa.client.OracleXADataSource', 'scope': '/Cell:cell01/', 'description': 'XAEVPSJDBCProvider', 'providerType': 'Oracle JDBC Driver (XA)', 'xa': 'true', 'classpath': '${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar'}}, action='W')
+        self.cg.processConfigItem(cmdDict={'DataSource': {'name': 'Q5DataSource', 'datasourceHelperClassname': 'com.ibm.websphere.rsadapter.Oracle11gDataStoreHelper', 'statementCacheSize': '600', 'providerType': 'Oracle JDBC Driver (XA)', 'jndiName': 'weblogic.jdbc.jts.Q5DataSource', 'xaRecoveryAuthAlias': 'HP8200SWaymouthNode01/local_oracle_alias', 'authDataAlias': 'HP8200SWaymouthNode01/local_oracle_alias', 'description': 'Q5DataSource', 'scope': '/JDBCProvider:XAEVPSJDBCProvider/'}}, action='W')
+        self.cg.processPropertySet(cmdDict={'J2EEResourceProperty': {'name': 'transactionBranchesLooselyCoupled', 'scope': '/DataSource:Q5DataSource/', 'type': 'java.lang.Boolean', 'value': 'true'}})
         self.datasource = AdminConfig.getid('/DataSource:Q5DataSource/')
-        self.connectionpool = AdminConfig.list('ConnectionPool', self.datasource)
-        self.maxConnections=AdminConfig.showAttribute(self.connectionpool, 'maxConnections')
-        self.minConnections=AdminConfig.showAttribute(self.connectionpool, 'minConnections')
-        self.testConnectionInterval=AdminConfig.showAttribute(self.connectionpool, 'testConnectionInterval')
-        self.testConnection=AdminConfig.showAttribute(self.connectionpool, 'testConnection')
-        self.assertEqual(self.maxConnections, '10')
-        self.assertEqual(self.minConnections, '1')
-        self.assertEqual(self.testConnectionInterval, '0')
-        self.assertEqual(self.testConnection, 'false')
+        self.j2eerespropList = AdminConfig.list('J2EEResourceProperty', self.datasource).split('\r\n')
+        for item in self.j2eerespropList:
+            if AdminConfig.showAttribute(item, 'name') == 'transactionBranchesLooselyCoupled':
+                self.assertEqual(AdminConfig.showAttribute(item, 'value'), 'false')
 
-    def testJAASAuthCreate(self):
-        self.cg.generateCommands(cmdList=[{'JAASAuthData': {'alias': 'local_oracle_alias', 'userId': 'swaymouth', 'password': 'secret', 'scope': '/Cell:cell01/'}}], action='W')
+    def testProcessSecrurityCreate(self):
+        self.cg.processSecurity(cmdDict={'JAASAuthData': {'alias': 'local_oracle_alias', 'userId': 'swaymouth', 'password': 'secret', 'scope': '/Cell:cell01/'}}, action='W')
         self.jassauthList = AdminConfig.list('JAASAuthData').split('\r\n')
         for item in self.jassauthList:
             if AdminConfig.showAttribute(item, 'alias') == 'local_oracle_alias':
                 self.assertEqual(AdminConfig.showAttribute(item, 'userId'), 'swaymouth')
 
-    def testJAASAuthModify(self):
-        self.cg.generateCommands(cmdList=[{'JAASAuthData': {'alias': 'local_oracle_alias', 'userId': 'swaymouth', 'password': 'secret', 'scope': '/Cell:cell01/'}}], action='W')
-        self.cg.generateCommands(cmdList=[{'JAASAuthData': {'alias': 'local_oracle_alias', 'userId': 'testuser', 'password': 'secret', 'scope': '/Cell:cell01/'}}], action='W')
+    def testProcessSecrurityModify(self):
+        self.cg.processSecurity(cmdDict={'JAASAuthData': {'alias': 'local_oracle_alias', 'userId': 'swaymouth', 'password': 'secret', 'scope': '/Cell:cell01/'}}, action='W')
+        self.cg.processSecurity(cmdDict={'JAASAuthData': {'alias': 'local_oracle_alias', 'userId': 'testuser', 'password': 'secret', 'scope': '/Cell:cell01/'}}, action='W')
         self.jassauthList = AdminConfig.list('JAASAuthData').split('\r\n')
         for item in self.jassauthList:
             if AdminConfig.showAttribute(item, 'alias') == 'local_oracle_alias':
                 self.assertEqual(AdminConfig.showAttribute(item, 'userId'), 'testuser')
 
-    def testJAASAuthRead(self):
-        self.cg.generateCommands(cmdList=[{'JAASAuthData': {'alias': 'local_oracle_alias', 'userId': 'swaymouth', 'password': 'secret', 'scope': '/Cell:cell01/'}}], action='W')
-        self.cg.generateCommands(cmdList=[{'JAASAuthData': {'alias': 'local_oracle_alias', 'userId': 'testuser', 'password': 'secret', 'scope': '/Cell:cell01/'}}])
+    def testProcessSecrurityRead(self):
+        self.cg.processSecurity(cmdDict={'JAASAuthData': {'alias': 'local_oracle_alias', 'userId': 'swaymouth', 'password': 'secret', 'scope': '/Cell:cell01/'}}, action='W')
+        self.cg.processSecurity(cmdDict={'JAASAuthData': {'alias': 'local_oracle_alias', 'userId': 'testuser', 'password': 'secret', 'scope': '/Cell:cell01/'}})
         self.jassauthList = AdminConfig.list('JAASAuthData').split('\r\n')
         for item in self.jassauthList:
             if AdminConfig.showAttribute(item, 'alias') == 'local_oracle_alias':
                 self.assertEqual(AdminConfig.showAttribute(item, 'userId'), 'swaymouth')
 
     def testMQQCFCreate(self):
-        self.cg.generateCommands(cmdList=[{'MQQueueConnectionFactory': {'transportType': 'BINDINGS_THEN_CLIENT', 'port': '1415', 'name': 'QCF1', 'scope': '/Cell:cell01/', 'host': 'localhost', 'channel': 'CH1', 'queueManager': 'QMGR1', 'jndiName': 'jms/QCF1'}}, {'connectionPool': {'maxConnections': '200', 'scope': '/MQQueueConnectionFactory:QCF1/', 'minConnections' : '0'}}, {'sessionPool': {'minConnections': '0', 'scope': '/MQQueueConnectionFactory:QCF1/'}}], action='W')
+        self.cg.processConfigItem(cmdDict={'MQQueueConnectionFactory': {'transportType': 'BINDINGS_THEN_CLIENT', 'port': '1415', 'name': 'QCF1', 'scope': '/Cell:cell01/', 'host': 'localhost', 'channel': 'CH1', 'queueManager': 'QMGR1', 'jndiName': 'jms/QCF1'}}, action='W')
         self.mqcf = AdminConfig.getid('/MQQueueConnectionFactory:QCF1/')
         self.jndiName=AdminConfig.showAttribute(self.mqcf, 'jndiName')
         self.assertEqual(self.jndiName, 'jms/QCF1')
 
     def testMQQCFModify(self):
-        self.cg.generateCommands(cmdList=[{'MQQueueConnectionFactory': {'transportType': 'BINDINGS_THEN_CLIENT', 'port': '1415', 'name': 'QCF1', 'scope': '/Cell:cell01/', 'host': 'localhost', 'channel': 'CH1', 'queueManager': 'QMGR1', 'jndiName': 'jms/QCF1'}}], action='W')
-        self.cg.generateCommands(cmdList=[{'MQQueueConnectionFactory': {'transportType': 'BINDINGS_THEN_CLIENT', 'port': '1415', 'name': 'QCF1', 'scope': '/Cell:cell01/', 'host': 'localhost', 'channel': 'CH1', 'queueManager': 'QMGR1', 'jndiName': 'jms/BogusName'}}], action='W')
+        self.cg.processConfigItem(cmdDict={'MQQueueConnectionFactory': {'transportType': 'BINDINGS_THEN_CLIENT', 'port': '1415', 'name': 'QCF1', 'scope': '/Cell:cell01/', 'host': 'localhost', 'channel': 'CH1', 'queueManager': 'QMGR1', 'jndiName': 'jms/QCF1'}}, action='W')
+        self.cg.processConfigItem(cmdDict={'MQQueueConnectionFactory': {'transportType': 'BINDINGS_THEN_CLIENT', 'port': '1415', 'name': 'QCF1', 'scope': '/Cell:cell01/', 'host': 'localhost', 'channel': 'CH1', 'queueManager': 'QMGR1', 'jndiName': 'jms/BogusName'}}, action='W')
         self.mqcf = AdminConfig.getid('/MQQueueConnectionFactory:QCF1/')
         self.jndiName=AdminConfig.showAttribute(self.mqcf, 'jndiName')
         self.assertEqual(self.jndiName, 'jms/BogusName')
 
     def testMQQCFRead(self):
-        self.cg.generateCommands(cmdList=[{'MQQueueConnectionFactory': {'transportType': 'BINDINGS_THEN_CLIENT', 'port': '1415', 'name': 'QCF1', 'scope': '/Cell:cell01/', 'host': 'localhost', 'channel': 'CH1', 'queueManager': 'QMGR1', 'jndiName': 'jms/QCF1'}}], action='W')
-        self.cg.generateCommands(cmdList=[{'MQQueueConnectionFactory': {'transportType': 'BINDINGS_THEN_CLIENT', 'port': '1415', 'name': 'QCF1', 'scope': '/Cell:cell01/', 'host': 'localhost', 'channel': 'CH1', 'queueManager': 'QMGR1', 'jndiName': 'jms/BogusName'}}])
+        self.cg.processConfigItem(cmdDict={'MQQueueConnectionFactory': {'transportType': 'BINDINGS_THEN_CLIENT', 'port': '1415', 'name': 'QCF1', 'scope': '/Cell:cell01/', 'host': 'localhost', 'channel': 'CH1', 'queueManager': 'QMGR1', 'jndiName': 'jms/QCF1'}}, action='W')
+        self.cg.processConfigItem(cmdDict={'MQQueueConnectionFactory': {'transportType': 'BINDINGS_THEN_CLIENT', 'port': '1415', 'name': 'QCF1', 'scope': '/Cell:cell01/', 'host': 'localhost', 'channel': 'CH1', 'queueManager': 'QMGR1', 'jndiName': 'jms/BogusName'}})
         self.mqcf = AdminConfig.getid('/MQQueueConnectionFactory:QCF1/')
         self.jndiName=AdminConfig.showAttribute(self.mqcf, 'jndiName')
         self.assertEqual(self.jndiName, 'jms/QCF1')
 
     def testMQQCreate(self):
-        self.cg.generateCommands(cmdList=[{'MQQueue' : {'name' : 'AccountingHVMessageSendQueue', 'jndiName' : 'dovetail/jms/AccountingHVMessageSendQueue', 'persistence' : 'PERSISTENT', 'baseQueueName' : 'AccountingHVMessageSendQueue', 'baseQueueManagerName' : 'QMGR1', 'queueManagerHost' : 'localhost', 'queueManagerPort' : '1415', 'serverConnectionChannelName' : 'CH1', 'scope': '/Cell:cell01/'}}], action='W')
+        self.cg.processConfigItem(cmdDict={'MQQueue' : {'name' : 'AccountingHVMessageSendQueue', 'jndiName' : 'dovetail/jms/AccountingHVMessageSendQueue', 'persistence' : 'PERSISTENT', 'baseQueueName' : 'AccountingHVMessageSendQueue', 'baseQueueManagerName' : 'QMGR1', 'queueManagerHost' : 'localhost', 'queueManagerPort' : '1415', 'serverConnectionChannelName' : 'CH1', 'scope': '/Cell:cell01/'}}, action='W')
         self.mqq = AdminConfig.getid('/MQQueue:AccountingHVMessageSendQueue/')
         self.jndiName=AdminConfig.showAttribute(self.mqq, 'jndiName')
         self.assertEqual(self.jndiName, 'dovetail/jms/AccountingHVMessageSendQueue')
 
     def testMQQModify(self):
-        self.cg.generateCommands(cmdList=[{'MQQueue' : {'name' : 'AccountingHVMessageSendQueue', 'jndiName' : 'dovetail/jms/AccountingHVMessageSendQueue', 'persistence' : 'PERSISTENT', 'baseQueueName' : 'AccountingHVMessageSendQueue', 'baseQueueManagerName' : 'QMGR1', 'queueManagerHost' : 'localhost', 'queueManagerPort' : '1415', 'serverConnectionChannelName' : 'CH1', 'scope': '/Cell:cell01/'}}], action='W')
-        self.cg.generateCommands(cmdList=[{'MQQueue' : {'name' : 'AccountingHVMessageSendQueue', 'jndiName' : 'jms/Bogus', 'persistence' : 'PERSISTENT', 'baseQueueName' : 'AccountingHVMessageSendQueue', 'baseQueueManagerName' : 'QMGR1', 'queueManagerHost' : 'localhost', 'queueManagerPort' : '1415', 'serverConnectionChannelName' : 'CH1', 'scope': '/Cell:cell01/'}}], action='W')
+        self.cg.processConfigItem(cmdDict={'MQQueue' : {'name' : 'AccountingHVMessageSendQueue', 'jndiName' : 'dovetail/jms/AccountingHVMessageSendQueue', 'persistence' : 'PERSISTENT', 'baseQueueName' : 'AccountingHVMessageSendQueue', 'baseQueueManagerName' : 'QMGR1', 'queueManagerHost' : 'localhost', 'queueManagerPort' : '1415', 'serverConnectionChannelName' : 'CH1', 'scope': '/Cell:cell01/'}}, action='W')
+        self.cg.processConfigItem(cmdDict={'MQQueue' : {'name' : 'AccountingHVMessageSendQueue', 'jndiName' : 'jms/Bogus', 'persistence' : 'PERSISTENT', 'baseQueueName' : 'AccountingHVMessageSendQueue', 'baseQueueManagerName' : 'QMGR1', 'queueManagerHost' : 'localhost', 'queueManagerPort' : '1415', 'serverConnectionChannelName' : 'CH1', 'scope': '/Cell:cell01/'}}, action='W')
         self.mqq = AdminConfig.getid('/MQQueue:AccountingHVMessageSendQueue/')
         self.jndiName=AdminConfig.showAttribute(self.mqq, 'jndiName')
         self.assertEqual(self.jndiName, 'jms/Bogus')
 
     def testMQQRead(self):
-        self.cg.generateCommands(cmdList=[{'MQQueue' : {'name' : 'AccountingHVMessageSendQueue', 'jndiName' : 'dovetail/jms/AccountingHVMessageSendQueue', 'persistence' : 'PERSISTENT', 'baseQueueName' : 'AccountingHVMessageSendQueue', 'baseQueueManagerName' : 'QMGR1', 'queueManagerHost' : 'localhost', 'queueManagerPort' : '1415', 'serverConnectionChannelName' : 'CH1', 'scope': '/Cell:cell01/'}}], action='W')
-        self.cg.generateCommands(cmdList=[{'MQQueue' : {'name' : 'AccountingHVMessageSendQueue', 'jndiName' : 'jms/Bogus', 'persistence' : 'PERSISTENT', 'baseQueueName' : 'AccountingHVMessageSendQueue', 'baseQueueManagerName' : 'QMGR1', 'queueManagerHost' : 'localhost', 'queueManagerPort' : '1415', 'serverConnectionChannelName' : 'CH1', 'scope': '/Cell:cell01/'}}])
+        self.cg.processConfigItem(cmdDict={'MQQueue' : {'name' : 'AccountingHVMessageSendQueue', 'jndiName' : 'dovetail/jms/AccountingHVMessageSendQueue', 'persistence' : 'PERSISTENT', 'baseQueueName' : 'AccountingHVMessageSendQueue', 'baseQueueManagerName' : 'QMGR1', 'queueManagerHost' : 'localhost', 'queueManagerPort' : '1415', 'serverConnectionChannelName' : 'CH1', 'scope': '/Cell:cell01/'}}, action='W')
+        self.cg.processConfigItem(cmdDict={'MQQueue' : {'name' : 'AccountingHVMessageSendQueue', 'jndiName' : 'jms/Bogus', 'persistence' : 'PERSISTENT', 'baseQueueName' : 'AccountingHVMessageSendQueue', 'baseQueueManagerName' : 'QMGR1', 'queueManagerHost' : 'localhost', 'queueManagerPort' : '1415', 'serverConnectionChannelName' : 'CH1', 'scope': '/Cell:cell01/'}})
         self.mqq = AdminConfig.getid('/MQQueue:AccountingHVMessageSendQueue/')
         self.jndiName=AdminConfig.showAttribute(self.mqq, 'jndiName')
         self.assertEqual(self.jndiName, 'dovetail/jms/AccountingHVMessageSendQueue')
 
     def testSIBCreate(self):
-        self.cg.generateCommands(cmdList=[{'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01'}}], action='W')
+        self.cg.processAdminTask(cmdDict={'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01'}}, action='W')
         self.sib = AdminConfig.getid('/SIBus:DovetailSIBus/')
         self.name=AdminConfig.showAttribute(self.sib, 'name')
         self.assertEqual(self.name, 'DovetailSIBus')
 
     def testSIBModify(self):
-        self.cg.generateCommands(cmdList=[{'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description1'}}], action='W')
-        self.cg.generateCommands(cmdList=[{'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description2'}}], action='W')
+        self.cg.processAdminTask(cmdDict={'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description1'}}, action='W')
+        self.cg.processAdminTask(cmdDict={'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description2'}}, action='W')
         self.sib = AdminConfig.getid('/SIBus:DovetailSIBus/')
         self.description=AdminConfig.showAttribute(self.sib, 'description')
         self.assertEqual(self.description, 'Description2')
 
     def testSIBRead(self):
-        self.cg.generateCommands(cmdList=[{'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description1'}}], action='W')
-        self.cg.generateCommands(cmdList=[{'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description2'}}])
+        self.cg.processAdminTask(cmdDict={'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description1'}}, action='W')
+        self.cg.processAdminTask(cmdDict={'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description2'}})
         self.sib = AdminConfig.getid('/SIBus:DovetailSIBus/')
         self.description=AdminConfig.showAttribute(self.sib, 'description')
         self.assertEqual(self.description, 'Description1')
 
     def testSIBBusMemberCreate(self):
-        self.cg.generateCommands(cmdList=[{'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description1'}}, {'SIBusMember' : {'scope' : '/SIBus:DovetailSIBus/', 'server' : 'srv01', 'node' : 'node01'}}], action='W')
+        self.cg.processAdminTask(cmdDict={'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description1'}}, action='W')
+        self.cg.processAdminTask(cmdDict={'SIBusMember' : {'scope' : '/SIBus:DovetailSIBus/', 'server' : 'srv01', 'node' : 'node01'}}, action='W')
         self.sib = AdminConfig.getid('/SIBus:DovetailSIBus/')
         self.name=AdminConfig.showAttribute(self.sib, 'name')
         self.assertEqual(self.name, 'DovetailSIBus')
 
+    def testSIBTopicSpaceCreate(self):
+        self.cg.processAdminTask(cmdDict={'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description1'}}, action='W')
+        self.cg.processAdminTask(cmdDict={'SIBusMember' : {'scope' : '/SIBus:DovetailSIBus/', 'server' : 'srv01', 'node' : 'node01'}}, action='W')
+        self.cg.processAdminTask(cmdDict={'SIBTopicSpace': {'identifier': 'CacheUpdateTopic', 'scope': '/SIBus:DovetailSIBus/', 'topicAccessCheckRequired': 'false'}}, action='W')
+        self.sib = AdminConfig.getid('/SIBus:DovetailSIBus/')
+        self.name=AdminConfig.showAttribute(self.sib, 'name')
+        self.assertEqual(self.name, 'DovetailSIBus')
+
+    def testJDBCProviderCreate(self):
+        self.cg.processConfigItem(cmdDict={'JDBCProvider': {'classpath': '${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar', 'name': 'XAEVPSJDBCProvider', 'implementationClassName': 'oracle.jdbc.xa.client.OracleXADataSource', 'scope': '/Cell:cell01/', 'description': 'XAEVPSJDBCProvider', 'providerType': 'Oracle JDBC Driver (XA)', 'xa': 'true'}}, action='W')
+        self.jdbcprov = AdminConfig.getid('/JDBCProvider:XAEVPSJDBCProvider/')
+        self.implementationClassName=AdminConfig.showAttribute(self.jdbcprov, 'implementationClassName')
+        self.assertEqual(self.implementationClassName, 'oracle.jdbc.xa.client.OracleXADataSource')
+
+    def testDataSourceCreate(self):
+        self.cg.processConfigItem(cmdDict={'JDBCProvider': {'classpath': '${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar', 'name': 'XAEVPSJDBCProvider', 'implementationClassName': 'oracle.jdbc.xa.client.OracleXADataSource', 'scope': '/Cell:cell01/', 'description': 'XAEVPSJDBCProvider', 'providerType': 'Oracle JDBC Driver (XA)', 'xa': 'true'}}, action='W')
+        self.cg.processConfigItem(cmdDict={'DataSource': {'name': 'Q5DataSource', 'datasourceHelperClassname': 'com.ibm.websphere.rsadapter.Oracle11gDataStoreHelper', 'statementCacheSize': '600', 'providerType': 'Oracle JDBC Driver (XA)', 'jndiName': 'weblogic.jdbc.jts.Q5DataSource', 'xaRecoveryAuthAlias': 'HP8200SWaymouthNode01/local_oracle_alias', 'authDataAlias': 'HP8200SWaymouthNode01/local_oracle_alias', 'description': 'Q5DataSource', 'scope': '/JDBCProvider:XAEVPSJDBCProvider/'}}, action='W')
+        self.jdbcprov = AdminConfig.getid('/JDBCProvider:XAEVPSJDBCProvider/')
+        self.implementationClassName=AdminConfig.showAttribute(self.jdbcprov, 'implementationClassName')
+        self.assertEqual(self.implementationClassName, 'oracle.jdbc.xa.client.OracleXADataSource')
+
 if __name__ == '__main__' or __name__ == 'main':
 
     #test suite that runs individual tests: use this for speed and enable only the tests you are develop[ing for.
-    #suite = unittest.TestSuite()
+    suite = unittest.TestSuite()
     #suite.addTest(TestProcessCommandsBASE('testSIBCreate'))
     #suite.addTest(TestProcessCommandsBASE('testSIBModify'))
     #suite.addTest(TestProcessCommandsBASE('testSIBRead'))
-    #suite.addTest(TestProcessCommandsBASE('testSIBBusMemberCreate'))
-    #unittest.TextTestRunner(verbosity=2).run(suite)
+    suite.addTest(TestProcessCommandsBASE('testGenerateCommands'))
+    suite.addTest(TestProcessCommandsBASE('testGenerateCommandsException'))
+    unittest.TextTestRunner(verbosity=2).run(suite)
 
     #Test suite to run everything.  Use this to sanity check all tests.
-    suite = unittest.TestLoader().loadTestsFromTestCase(TestProcessCommandsBASE)
-    unittest.TextTestRunner(verbosity=2).run(suite)
+    #suite = unittest.TestLoader().loadTestsFromTestCase(TestProcessCommandsBASE)
+    #unittest.TextTestRunner(verbosity=2).run(suite)
