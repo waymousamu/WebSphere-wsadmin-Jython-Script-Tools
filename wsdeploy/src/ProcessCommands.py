@@ -375,7 +375,7 @@ class ProcessCommands:
                         attrDict['bus'] = v[key]
                     else:
                         attrDict[key] = v[key]
-            elif k == 'SIBusMember':
+            elif k == 'SIBusMember' or 'SIBTopicSpace':
                 if key == 'scope':
                     self.logger.trace("convertAttributesToAdminTaskStep: converting attribute '%s' to AdminTask step '%s'" % (key, 'bus'))
                     bus = value.split(':')
@@ -387,6 +387,9 @@ class ProcessCommands:
                     bus = bus[0]
                     self.logger.trace("convertAttributesToAdminTaskStep: bus=%s" % bus)
                     attrDict['bus'] = bus
+                elif key == 'identifier':
+                    self.logger.trace("convertAttributesToAdminTaskStep: converting attribute '%s' to AdminTask step '%s'" % (key, 'name'))
+                    attrDict['name'] = v[key]
                 else:
                     attrDict[key] = v[key]
         self.logger.trace("convertAttributesToAdminTaskStep: attrDict=%s" % attrDict)
@@ -422,6 +425,32 @@ class ProcessCommands:
             self.logger.info("processSIBusMember: creating %s:%s" % (k, attrDict['bus']))
             self.logger.debug("processSIBusMember: command=AdminTask.addSIBusMember(%s)" % (["-%s %s" % (key, value) for key, value in attrDict.items()]))
             AdminTask.addSIBusMember(["-%s %s" % (key, value) for key, value in attrDict.items()])
+
+    def processSIBTopicSpace(self, k=None, a=None, action=None):
+        attrDict=a
+        attrDict['type'] = 'TopicSpace'
+        self.sib = None
+        queueList = AdminTask.listSIBDestinations(['-bus %s' % attrDict['bus']]).split('\r\n')
+        self.logger.trace("processSIBTopicSpace: queueList=%s" % queueList)
+        for queue in queueList:
+            self.logger.trace("processSIBTopicSpace: queue=%s" % queue)
+            identifier = AdminConfig.showAttribute(queue, "identifier")
+            self.logger.trace("processSIBTopicSpace: identifier=%s" % identifier)
+            if (identifier == attrDict['name']):
+                self.sib = queue
+                self.logger.trace("processSIBTopicSpace: topic %s already exists" % attrDict['name'])
+        self.logger.trace("processSIBTopicSpace: self.sib=%s" % self.sib)
+        if self.sib != None:
+            self.logger.warn("processSIBTopicSpace: topic %s already exists on bus %s" % (attrDict['name'], attrDict['bus']))
+            destAttr = AdminTask.showSIBDestination('-bus %s -name %s' % (attrDict['bus'], attrDict['name']))
+            print destAttr
+            for attr in destAttr:
+                pairStr = attr.split('=')
+                print pairStr
+        else:
+            self.logger.info("processSIBTopicSpace: creating %s:%s" % (k, attrDict['name']))
+            self.logger.debug("processSIBTopicSpace: command=AdminTask.createSIBDestination(%s)" % (["-%s %s" % (key, value) for key, value in attrDict.items()]))
+            AdminTask.createSIBDestination(["-%s %s" % (key, value) for key, value in attrDict.items()])
 
 class ProcessCommandException(Exception):
     """ General exception method for class. """

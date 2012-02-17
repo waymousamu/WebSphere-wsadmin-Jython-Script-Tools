@@ -85,9 +85,12 @@ class TestProcessCommandsBASE(unittest.TestCase):
         self.mqcf = AdminConfig.getid('/MQQueueConnectionFactory:QCF1/')
         if self.mqcf != "":
             AdminConfig.remove(self.mqcf)
-        self.sib = AdminConfig.getid('/SIBus:DovetailSIBus/')
-        if self.sib != "":
-            AdminConfig.remove(self.sib)
+        busList = AdminTask.listSIBuses().split('\r\n')
+        for bus in busList:
+            name = AdminConfig.showAttribute(bus, 'name')
+            #print name
+            if name == 'DovetailSIBus':
+                AdminTask.deleteSIBus(['-bus %s' % name])
 
     def testNoCommandsException(self):
         cmdList = None
@@ -276,8 +279,8 @@ class TestProcessCommandsBASE(unittest.TestCase):
     def testSIBCreate(self):
         self.cg.processAdminTask(cmdDict={'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01'}}, action='W')
         self.sib = AdminConfig.getid('/SIBus:DovetailSIBus/')
-        self.name=AdminConfig.showAttribute(self.sib, 'name')
-        self.assertEqual(self.name, 'DovetailSIBus')
+        self.description=AdminConfig.showAttribute(self.sib, 'name')
+        self.assertEqual(self.description, 'DovetailSIBus')
 
     def testSIBModify(self):
         self.cg.processAdminTask(cmdDict={'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description1'}}, action='W')
@@ -296,17 +299,44 @@ class TestProcessCommandsBASE(unittest.TestCase):
     def testSIBBusMemberCreate(self):
         self.cg.processAdminTask(cmdDict={'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description1'}}, action='W')
         self.cg.processAdminTask(cmdDict={'SIBusMember' : {'scope' : '/SIBus:DovetailSIBus/', 'server' : 'srv01', 'node' : 'node01'}}, action='W')
-        self.sib = AdminConfig.getid('/SIBus:DovetailSIBus/')
-        self.name=AdminConfig.showAttribute(self.sib, 'name')
-        self.assertEqual(self.name, 'DovetailSIBus')
+        memberList = AdminTask.listSIBusMembers(['-bus DovetailSIBus']).split('\r\n')
+        #print memberList
+        server = ''
+        for member in memberList:
+            #print member
+            server = AdminConfig.showAttribute(member, 'server')
+            #print server
+        self.assertEqual(server, 'srv01')
 
     def testSIBTopicSpaceCreate(self):
         self.cg.processAdminTask(cmdDict={'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description1'}}, action='W')
         self.cg.processAdminTask(cmdDict={'SIBusMember' : {'scope' : '/SIBus:DovetailSIBus/', 'server' : 'srv01', 'node' : 'node01'}}, action='W')
-        self.cg.processAdminTask(cmdDict={'SIBTopicSpace': {'identifier': 'CacheUpdateTopic', 'scope': '/SIBus:DovetailSIBus/', 'topicAccessCheckRequired': 'false'}}, action='W')
-        self.sib = AdminConfig.getid('/SIBus:DovetailSIBus/')
-        self.name=AdminConfig.showAttribute(self.sib, 'name')
-        self.assertEqual(self.name, 'DovetailSIBus')
+        self.cg.processAdminTask(cmdDict={'SIBTopicSpace': {'identifier': 'CacheUpdateTopic', 'scope': '/SIBus:DovetailSIBus/', 'topicAccessCheckRequired': 'false', 'node': 'node01', 'server': 'srv01'}}, action='W')
+        destList = AdminTask.listSIBDestinations(['-bus DovetailSIBus']).split('\r\n')
+        topic = ''
+        for dest in destList:
+            topic = AdminConfig.showAttribute(dest, 'identifier')
+        self.assertEqual(topic, 'CacheUpdateTopic')
+
+    def testSIBTopicSpaceModify(self):
+        self.cg.processAdminTask(cmdDict={'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description1'}}, action='W')
+        self.cg.processAdminTask(cmdDict={'SIBusMember' : {'scope' : '/SIBus:DovetailSIBus/', 'server' : 'srv01', 'node' : 'node01'}}, action='W')
+        self.cg.processAdminTask(cmdDict={'SIBTopicSpace': {'identifier': 'CacheUpdateTopic', 'scope': '/SIBus:DovetailSIBus/', 'topicAccessCheckRequired': 'false', 'node': 'node01', 'server': 'srv01'}}, action='W')
+        self.cg.processAdminTask(cmdDict={'SIBTopicSpace': {'identifier': 'CacheUpdateTopic', 'scope': '/SIBus:DovetailSIBus/', 'topicAccessCheckRequired': 'true', 'node': 'node01', 'server': 'srv01'}}, action='W')
+        destList = AdminTask.listSIBDestinations(['-bus DovetailSIBus']).split('\r\n')
+        testattr = ''
+        for dest in destList:
+            testattr = AdminConfig.showAttribute(dest, 'topicAccessCheckRequired')
+        self.assertEqual(testattr, 'true')
+
+    def testSIBTopicSpaceRead(self):
+        self.cg.processAdminTask(cmdDict={'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description1'}}, action='W')
+        self.cg.processAdminTask(cmdDict={'SIBusMember' : {'scope' : '/SIBus:DovetailSIBus/', 'server' : 'srv01', 'node' : 'node01'}}, action='W')
+        self.cg.processAdminTask(cmdDict={'SIBTopicSpace': {'identifier': 'CacheUpdateTopic', 'scope': '/SIBus:DovetailSIBus/', 'topicAccessCheckRequired': 'false', 'node': 'node01', 'server': 'srv01'}}, action='W')
+        self.cg.processAdminTask(cmdDict={'SIBTopicSpace': {'identifier': 'CacheUpdateTopic', 'scope': '/SIBus:DovetailSIBus/', 'topicAccessCheckRequired': 'true', 'node': 'node01', 'server': 'srv01'}})
+        self.sib = AdminConfig.getid('/SIBTopicSpace:CacheUpdateTopic/')
+        self.name=AdminConfig.showAttribute(self.sib, 'topicAccessCheckRequired')
+        self.assertEqual(self.name, 'false')
 
     def testJDBCProviderCreate(self):
         self.cg.processConfigItem(cmdDict={'JDBCProvider': {'classpath': '${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar', 'name': 'XAEVPSJDBCProvider', 'implementationClassName': 'oracle.jdbc.xa.client.OracleXADataSource', 'scope': '/Cell:cell01/', 'description': 'XAEVPSJDBCProvider', 'providerType': 'Oracle JDBC Driver (XA)', 'xa': 'true'}}, action='W')
@@ -327,9 +357,12 @@ if __name__ == '__main__' or __name__ == 'main':
     suite = unittest.TestSuite()
     #suite.addTest(TestProcessCommandsBASE('testSIBCreate'))
     #suite.addTest(TestProcessCommandsBASE('testSIBModify'))
+    suite.addTest(TestProcessCommandsBASE('testSIBTopicSpaceModify'))
+    #suite.addTest(TestProcessCommandsBASE('testSIBModify'))
     #suite.addTest(TestProcessCommandsBASE('testSIBRead'))
-    suite.addTest(TestProcessCommandsBASE('testGenerateCommands'))
-    suite.addTest(TestProcessCommandsBASE('testGenerateCommandsException'))
+    #suite.addTest(TestProcessCommandsBASE('testSIBTopicSpaceRead'))
+    #suite.addTest(TestProcessCommandsBASE('testGenerateCommands'))
+    #suite.addTest(TestProcessCommandsBASE('testGenerateCommandsException'))
     unittest.TextTestRunner(verbosity=2).run(suite)
 
     #Test suite to run everything.  Use this to sanity check all tests.

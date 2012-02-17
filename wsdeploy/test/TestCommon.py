@@ -39,7 +39,7 @@ CONFDICT_BASE = [
                  {'MQQueue': {'name': 'AccountingHVMessageSendQueue', 'baseQueueName': 'AccountingHVMessageSendQueue', 'serverConnectionChannelName': 'CH1', 'baseQueueManagerName': 'QM1', 'jndiName': 'dovetail/jms/AccountingHVMessageSendQueue', 'queueManagerHost': 'localhost', 'persistence': 'PERSISTENT', 'scope': '/Cell:cell01/', 'queueManagerPort': '1414'}},
                  {'SIBus': {'name': 'DovetailSIBus', 'scope': '/Cell:cell01/'}},
                  {'SIBusMember': {'scope': '/SIBus:DovetailSIBus/', 'node': 'node01', 'server': 'srv01'}},
-                 {'SIBTopicSpace': {'identifier': 'CacheUpdateTopic', 'scope': '/SIBus:DovetailSIBus/', 'topicAccessCheckRequired': 'false'}}
+                 {'SIBTopicSpace': {'identifier': 'CacheUpdateTopic', 'scope': '/SIBus:DovetailSIBus/', 'topicAccessCheckRequired': 'false', 'node': 'node01', 'server': 'srv01'}}
                  ]
 
 CONFXML_BASE = """
