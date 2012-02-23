@@ -331,7 +331,7 @@ class ProcessCommands:
             elif k == 'SIBusMember':
                 self.processSIBusMember(k=k, a=attrDict, action=action)
             elif k == 'SIBTopicSpace':
-                self.processSIBTopicSpace(k=k, a=attrDict, action=action)
+                self.processSIBTopicSpace(k=k, a=attrDict, c=cmdDict, action=action)
         else:
             self.logger.error("processPropertySet: key and value parameters were not suppled to the method.")
             raise ProcessCommandException("key and value parameters were not suppled to the method.")
@@ -426,9 +426,12 @@ class ProcessCommands:
             self.logger.debug("processSIBusMember: command=AdminTask.addSIBusMember(%s)" % (["-%s %s" % (key, value) for key, value in attrDict.items()]))
             AdminTask.addSIBusMember(["-%s %s" % (key, value) for key, value in attrDict.items()])
 
-    def processSIBTopicSpace(self, k=None, a=None, action=None):
+    def processSIBTopicSpace(self, k=None, a=None, c=None, action=None):
         attrDict=a
         attrDict['type'] = 'TopicSpace'
+        self.logger.trace("processSIBTopicSpace: attrDict=%s" % attrDict)
+        cmdDict=c['SIBTopicSpace']
+        self.logger.trace("processSIBTopicSpace: cmdDict=%s" % cmdDict)
         self.sib = None
         queueList = AdminTask.listSIBDestinations(['-bus %s' % attrDict['bus']]).split('\r\n')
         self.logger.trace("processSIBTopicSpace: queueList=%s" % queueList)
@@ -442,11 +445,19 @@ class ProcessCommands:
         self.logger.trace("processSIBTopicSpace: self.sib=%s" % self.sib)
         if self.sib != None:
             self.logger.warn("processSIBTopicSpace: topic %s already exists on bus %s" % (attrDict['name'], attrDict['bus']))
-            destAttr = AdminTask.showSIBDestination('-bus %s -name %s' % (attrDict['bus'], attrDict['name']))
-            print destAttr
-            for attr in destAttr:
-                pairStr = attr.split('=')
-                print pairStr
+            self.logger.trace("processSIBTopicSpace: topic attributes:%s" % AdminConfig.show(self.sib).split('\r\n'))
+            for key, value in cmdDict.items():
+                self.logger.trace("processSIBTopicSpace: key=%s, value=%s" % (key, value))
+                if key != 'scope' and key != 'node' and key != 'server' and key != 'identifier':
+                    actualValue = AdminConfig.showAttribute(self.sib, key)
+                    self.logger.trace("processSIBTopicSpace: actualValue=%s" % actualValue)
+                    if actualValue != value:
+                        if action == 'W':
+                            self.logger.info("processSIBTopicSpace: modifying attr %s: actualValue=%s, config=%s" % (key, actualValue, value))
+                            self.logger.debug("processSIBTopicSpace: command=AdminTask.modifySIBDestination(['-bus %s','-name %s','-%s %s'])" % (attrDict['bus'], attrDict['name'], key, value))
+                            AdminTask.modifySIBDestination(['-bus', '%s' % attrDict['bus'], '-name',  '%s' % attrDict['name'],'-%s' % key,  '%s' % value])
+                        else:
+                            self.logger.warn("processSIBTopicSpace: audit failure %s:%s: actualValue=%s, config=%s" % (AdminConfig.showAttribute(self.sib,'identifier'), key, actualValue, value))
         else:
             self.logger.info("processSIBTopicSpace: creating %s:%s" % (k, attrDict['name']))
             self.logger.debug("processSIBTopicSpace: command=AdminTask.createSIBDestination(%s)" % (["-%s %s" % (key, value) for key, value in attrDict.items()]))

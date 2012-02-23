@@ -86,11 +86,13 @@ class TestProcessCommandsBASE(unittest.TestCase):
         if self.mqcf != "":
             AdminConfig.remove(self.mqcf)
         busList = AdminTask.listSIBuses().split('\r\n')
+        #print busList
         for bus in busList:
-            name = AdminConfig.showAttribute(bus, 'name')
-            #print name
-            if name == 'DovetailSIBus':
-                AdminTask.deleteSIBus(['-bus %s' % name])
+            if bus != '':
+                name = AdminConfig.showAttribute(bus, 'name')
+                #print name
+                if name == 'DovetailSIBus':
+                    AdminTask.deleteSIBus(['-bus %s' % name])
 
     def testNoCommandsException(self):
         cmdList = None
@@ -180,8 +182,8 @@ class TestProcessCommandsBASE(unittest.TestCase):
         self.jvm = AdminConfig.list('JavaVirtualMachine', self.srv)
         self.maximumHeapSize=AdminConfig.showAttribute(self.jvm, 'maximumHeapSize')
         self.initialHeapSize=AdminConfig.showAttribute(self.jvm, 'initialHeapSize')
-        self.assertEqual(self.maximumHeapSize, '0')
-        self.assertEqual(self.initialHeapSize, '0')
+        self.assertEqual(self.maximumHeapSize, '2048')
+        self.assertEqual(self.initialHeapSize, '1024')
 
     def testProcessPropertySetCreate(self):
         self.cg.processConfigItem(cmdDict={'JDBCProvider': {'name': 'XAEVPSJDBCProvider', 'implementationClassName': 'oracle.jdbc.xa.client.OracleXADataSource', 'scope': '/Cell:cell01/', 'description': 'XAEVPSJDBCProvider', 'providerType': 'Oracle JDBC Driver (XA)', 'xa': 'true', 'classpath': '${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar'}}, action='W')
@@ -324,19 +326,29 @@ class TestProcessCommandsBASE(unittest.TestCase):
         self.cg.processAdminTask(cmdDict={'SIBTopicSpace': {'identifier': 'CacheUpdateTopic', 'scope': '/SIBus:DovetailSIBus/', 'topicAccessCheckRequired': 'false', 'node': 'node01', 'server': 'srv01'}}, action='W')
         self.cg.processAdminTask(cmdDict={'SIBTopicSpace': {'identifier': 'CacheUpdateTopic', 'scope': '/SIBus:DovetailSIBus/', 'topicAccessCheckRequired': 'true', 'node': 'node01', 'server': 'srv01'}}, action='W')
         destList = AdminTask.listSIBDestinations(['-bus DovetailSIBus']).split('\r\n')
+        #print destList
         testattr = ''
         for dest in destList:
-            testattr = AdminConfig.showAttribute(dest, 'topicAccessCheckRequired')
-        self.assertEqual(testattr, 'true')
+            #print AdminConfig.show(dest, 'identifier')
+            if AdminConfig.showAttribute(dest, 'identifier') == 'CacheUpdateTopic':
+                testattr = AdminConfig.showAttribute(dest, 'topicAccessCheckRequired')
+                #print testattr
+                self.assertEqual(testattr, 'true')
 
     def testSIBTopicSpaceRead(self):
         self.cg.processAdminTask(cmdDict={'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description1'}}, action='W')
         self.cg.processAdminTask(cmdDict={'SIBusMember' : {'scope' : '/SIBus:DovetailSIBus/', 'server' : 'srv01', 'node' : 'node01'}}, action='W')
         self.cg.processAdminTask(cmdDict={'SIBTopicSpace': {'identifier': 'CacheUpdateTopic', 'scope': '/SIBus:DovetailSIBus/', 'topicAccessCheckRequired': 'false', 'node': 'node01', 'server': 'srv01'}}, action='W')
         self.cg.processAdminTask(cmdDict={'SIBTopicSpace': {'identifier': 'CacheUpdateTopic', 'scope': '/SIBus:DovetailSIBus/', 'topicAccessCheckRequired': 'true', 'node': 'node01', 'server': 'srv01'}})
-        self.sib = AdminConfig.getid('/SIBTopicSpace:CacheUpdateTopic/')
-        self.name=AdminConfig.showAttribute(self.sib, 'topicAccessCheckRequired')
-        self.assertEqual(self.name, 'false')
+        destList = AdminTask.listSIBDestinations(['-bus DovetailSIBus']).split('\r\n')
+        #print destList
+        testattr = ''
+        for dest in destList:
+            #print AdminConfig.show(dest, 'identifier')
+            if AdminConfig.showAttribute(dest, 'identifier') == 'CacheUpdateTopic':
+                testattr = AdminConfig.showAttribute(dest, 'topicAccessCheckRequired')
+                #print testattr
+                self.assertEqual(testattr, 'false')
 
     def testJDBCProviderCreate(self):
         self.cg.processConfigItem(cmdDict={'JDBCProvider': {'classpath': '${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar', 'name': 'XAEVPSJDBCProvider', 'implementationClassName': 'oracle.jdbc.xa.client.OracleXADataSource', 'scope': '/Cell:cell01/', 'description': 'XAEVPSJDBCProvider', 'providerType': 'Oracle JDBC Driver (XA)', 'xa': 'true'}}, action='W')
@@ -354,17 +366,18 @@ class TestProcessCommandsBASE(unittest.TestCase):
 if __name__ == '__main__' or __name__ == 'main':
 
     #test suite that runs individual tests: use this for speed and enable only the tests you are develop[ing for.
-    suite = unittest.TestSuite()
+    #suite = unittest.TestSuite()
     #suite.addTest(TestProcessCommandsBASE('testSIBCreate'))
     #suite.addTest(TestProcessCommandsBASE('testSIBModify'))
-    suite.addTest(TestProcessCommandsBASE('testSIBTopicSpaceModify'))
+    #suite.addTest(TestProcessCommandsBASE('testSIBTopicSpaceModify'))
     #suite.addTest(TestProcessCommandsBASE('testSIBModify'))
     #suite.addTest(TestProcessCommandsBASE('testSIBRead'))
     #suite.addTest(TestProcessCommandsBASE('testSIBTopicSpaceRead'))
+    #suite.addTest(TestProcessCommandsBASE('testNoCommandsException'))
     #suite.addTest(TestProcessCommandsBASE('testGenerateCommands'))
     #suite.addTest(TestProcessCommandsBASE('testGenerateCommandsException'))
-    unittest.TextTestRunner(verbosity=2).run(suite)
+    #unittest.TextTestRunner(verbosity=2).run(suite)
 
     #Test suite to run everything.  Use this to sanity check all tests.
-    #suite = unittest.TestLoader().loadTestsFromTestCase(TestProcessCommandsBASE)
-    #unittest.TextTestRunner(verbosity=2).run(suite)
+    suite = unittest.TestLoader().loadTestsFromTestCase(TestProcessCommandsBASE)
+    unittest.TextTestRunner(verbosity=2).run(suite)
