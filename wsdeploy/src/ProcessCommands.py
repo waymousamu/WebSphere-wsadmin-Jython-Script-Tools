@@ -62,8 +62,8 @@ class ProcessCommands:
                 elif k == "JavaVirtualMachine" or k == "ProcessExecution":
                     self.logger.trace("generateCommands: block = JavaVirtualMachine, ProcessExecution")
                     self.processNestedAttribute(cmdDict=cmdDict, action=action)
-                elif k == 'SIBus' or k == 'SIBusMember' or k == 'SIBTopicSpace':
-                    self.logger.trace("generateCommands: block = SIBus, SIBusMember, SIBTopicSpace")
+                elif k == 'SIBus' or k == 'SIBusMember' or k == 'SIBTopicSpace' or k == 'SIBQueue':
+                    self.logger.trace("generateCommands: block = SIBus, SIBusMember, SIBTopicSpace, SIBQueue")
                     self.processAdminTask(cmdDict=cmdDict, action=action)
                 elif k == "env" or k == "Node" or k == 'dmgr' or k == 'JMSProvider' or k == 'J2CResourceAdapter':
                     self.logger.trace("generateCommands: block = env, Node, dmgr")
@@ -356,6 +356,8 @@ class ProcessCommands:
                 self.processSIBusMember(k=k, a=attrDict, action=action)
             elif k == 'SIBTopicSpace':
                 self.processSIBTopicSpace(k=k, a=attrDict, c=cmdDict, action=action)
+            elif k == 'SIBQueue':
+                self.processSIBQueue(k=k, a=attrDict, c=cmdDict, action=action)
         else:
             self.logger.error("processPropertySet: key and value parameters were not suppled to the method.")
             raise ProcessCommandException("key and value parameters were not suppled to the method.")
@@ -416,7 +418,7 @@ class ProcessCommands:
                         attrDict['bus'] = v[key]
                     else:
                         attrDict[key] = v[key]
-            elif k == 'SIBusMember' or 'SIBTopicSpace':
+            elif k == 'SIBusMember' or 'SIBTopicSpace' or 'SIBQueue':
                 if key == 'scope':
                     self.logger.trace("convertAttributesToAdminTaskStep: converting attribute '%s' to AdminTask step '%s'" % (key, 'bus'))
                     bus = value.split(':')
@@ -502,6 +504,43 @@ class ProcessCommands:
         else:
             self.logger.info("processSIBTopicSpace: creating %s:%s" % (k, attrDict['name']))
             self.logger.debug("processSIBTopicSpace: command=AdminTask.createSIBDestination(%s)" % (["-%s %s" % (key, value) for key, value in attrDict.items()]))
+            AdminTask.createSIBDestination(["-%s %s" % (key, value) for key, value in attrDict.items()])
+
+    def processSIBQueue(self, k=None, a=None, c=None, action=None):
+        attrDict=a
+        attrDict['type'] = 'Queue'
+        self.logger.trace("processSIBQueue: attrDict=%s" % attrDict)
+        cmdDict=c['SIBQueue']
+        self.logger.trace("processSIBQueue: cmdDict=%s" % cmdDict)
+        self.sib = None
+        queueList = AdminTask.listSIBDestinations(['-bus %s' % attrDict['bus']]).split('\r\n')
+        self.logger.trace("processSIBQueue: queueList=%s" % queueList)
+        for queue in queueList:
+            self.logger.trace("processSIBQueue: queue=%s" % queue)
+            identifier = AdminConfig.showAttribute(queue, "identifier")
+            self.logger.trace("processSIBQueue: identifier=%s" % identifier)
+            if (identifier == attrDict['name']):
+                self.sib = queue
+                self.logger.trace("processSIBQueue: queue %s already exists" % attrDict['name'])
+        self.logger.trace("processSIBQueue: self.sib=%s" % self.sib)
+        if self.sib != None:
+            self.logger.warn("processSIBQueue: queue %s already exists on bus %s" % (attrDict['name'], attrDict['bus']))
+            self.logger.trace("processSIBQueue: queue attributes:%s" % AdminConfig.show(self.sib).split('\r\n'))
+            for key, value in cmdDict.items():
+                self.logger.trace("processSIBQueue: key=%s, value=%s" % (key, value))
+                if key != 'scope' and key != 'node' and key != 'server' and key != 'identifier':
+                    actualValue = AdminConfig.showAttribute(self.sib, key)
+                    self.logger.trace("processSIBQueue: actualValue=%s" % actualValue)
+                    if actualValue != value:
+                        if action == 'W':
+                            self.logger.info("processSIBQueue: modifying attr %s: actualValue=%s, config=%s" % (key, actualValue, value))
+                            self.logger.debug("processSIBQueue: command=AdminTask.modifySIBDestination(['-bus %s','-name %s','-%s %s'])" % (attrDict['bus'], attrDict['name'], key, value))
+                            AdminTask.modifySIBDestination(['-bus', '%s' % attrDict['bus'], '-name',  '%s' % attrDict['name'],'-%s' % key,  '%s' % value])
+                        else:
+                            self.logger.warn("processSIBQueue: audit failure %s:%s: actualValue=%s, config=%s" % (AdminConfig.showAttribute(self.sib,'identifier'), key, actualValue, value))
+        else:
+            self.logger.info("processSIBQueue: creating %s:%s" % (k, attrDict['name']))
+            self.logger.debug("processSIBQueue: command=AdminTask.createSIBDestination(%s)" % (["-%s %s" % (key, value) for key, value in attrDict.items()]))
             AdminTask.createSIBDestination(["-%s %s" % (key, value) for key, value in attrDict.items()])
 
 class ProcessCommandException(Exception):

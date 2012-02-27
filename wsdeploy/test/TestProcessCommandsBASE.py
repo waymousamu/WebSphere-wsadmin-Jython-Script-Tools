@@ -400,6 +400,46 @@ class TestProcessCommandsBASE(unittest.TestCase):
         self.cacheSize=AdminConfig.showAttribute(self.ejbc, 'cacheSize')
         self.assertEqual(self.cacheSize, '2000')
 
+    def testSIBQueueCreate(self):
+        self.cg.processAdminTask(cmdDict={'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description1'}}, action='W')
+        self.cg.processAdminTask(cmdDict={'SIBusMember' : {'scope' : '/SIBus:DovetailSIBus/', 'server' : 'srv01', 'node' : 'node01'}}, action='W')
+        self.cg.processAdminTask(cmdDict={'SIBQueue': {'identifier': 'AsyncActionQueue', 'scope': '/SIBus:DovetailSIBus/', 'node': 'node01', 'server': 'srv01'}}, action='W')
+        destList = AdminTask.listSIBDestinations(['-bus DovetailSIBus']).split('\r\n')
+        topic = ''
+        for dest in destList:
+            topic = AdminConfig.showAttribute(dest, 'identifier')
+        self.assertEqual(topic, 'AsyncActionQueue')
+
+    def testSIBQueueModify(self):
+        self.cg.processAdminTask(cmdDict={'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description1'}}, action='W')
+        self.cg.processAdminTask(cmdDict={'SIBusMember' : {'scope' : '/SIBus:DovetailSIBus/', 'server' : 'srv01', 'node' : 'node01'}}, action='W')
+        self.cg.processAdminTask(cmdDict={'SIBQueue': {'identifier': 'AsyncActionQueue', 'scope': '/SIBus:DovetailSIBus/', 'node': 'node01', 'server': 'srv01'}}, action='W')
+        self.cg.processAdminTask(cmdDict={'SIBQueue': {'identifier': 'AsyncActionQueue', 'scope': '/SIBus:DovetailSIBus/', 'node': 'node01', 'server': 'srv01'}}, action='W')
+        destList = AdminTask.listSIBDestinations(['-bus DovetailSIBus']).split('\r\n')
+        #print destList
+        testattr = ''
+        for dest in destList:
+            #print AdminConfig.show(dest, 'identifier')
+            if AdminConfig.showAttribute(dest, 'identifier') == 'AsyncActionQueue':
+                testattr = AdminConfig.showAttribute(dest, 'topicAccessCheckRequired')
+                #print testattr
+                self.assertEqual(testattr, 'true')
+
+    def testSIBQueueRead(self):
+        self.cg.processAdminTask(cmdDict={'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description1'}}, action='W')
+        self.cg.processAdminTask(cmdDict={'SIBusMember' : {'scope' : '/SIBus:DovetailSIBus/', 'server' : 'srv01', 'node' : 'node01'}}, action='W')
+        self.cg.processAdminTask(cmdDict={'SIBQueue': {'identifier': 'AsyncActionQueue', 'scope': '/SIBus:DovetailSIBus/', 'node': 'node01', 'server': 'srv01'}}, action='W')
+        self.cg.processAdminTask(cmdDict={'SIBQueue': {'identifier': 'AsyncActionQueue', 'scope': '/SIBus:DovetailSIBus/', 'node': 'node01', 'server': 'srv01'}})
+        destList = AdminTask.listSIBDestinations(['-bus DovetailSIBus']).split('\r\n')
+        #print destList
+        testattr = ''
+        for dest in destList:
+            #print AdminConfig.show(dest, 'identifier')
+            if AdminConfig.showAttribute(dest, 'identifier') == 'AsyncActionQueue':
+                testattr = AdminConfig.showAttribute(dest, 'topicAccessCheckRequired')
+                #print testattr
+                self.assertEqual(testattr, 'false')
+
 if __name__ == '__main__' or __name__ == 'main':
 
     #test suite that runs individual tests: use this for speed and enable only the tests you are develop[ing for.
@@ -408,12 +448,14 @@ if __name__ == '__main__' or __name__ == 'main':
     #suite.addTest(TestProcessCommandsBASE('testJ2CActivationSpecModify'))
     #suite.addTest(TestProcessCommandsBASE('testJ2CActivationSpecRead'))
     #suite.addTest(TestProcessCommandsBASE('testMQQCFCreate'))
-    #suite.addTest(TestProcessCommandsBASE('testSIBTopicSpaceModify'))
+
     #suite.addTest(TestProcessCommandsBASE('testSIBModify'))
     #suite.addTest(TestProcessCommandsBASE('testSIBRead'))
-    #suite.addTest(TestProcessCommandsBASE('testSIBTopicSpaceRead'))
+    suite.addTest(TestProcessCommandsBASE('testSIBQueueCreate'))
+    suite.addTest(TestProcessCommandsBASE('testSIBQueueModify'))
+    suite.addTest(TestProcessCommandsBASE('testSIBQueueRead'))
     #suite.addTest(TestProcessCommandsBASE('testEJBContainerModify'))
-    suite.addTest(TestProcessCommandsBASE('testGenerateCommands'))
+    #suite.addTest(TestProcessCommandsBASE('testGenerateCommands'))
     #suite.addTest(TestProcessCommandsBASE('testGenerateCommandsException'))
     unittest.TextTestRunner(verbosity=2).run(suite)
 
