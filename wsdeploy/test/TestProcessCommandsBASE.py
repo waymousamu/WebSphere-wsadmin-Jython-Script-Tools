@@ -360,14 +360,21 @@ class TestProcessCommandsBASE(unittest.TestCase):
         self.assertEqual(self.implementationClassName, 'oracle.jdbc.xa.client.OracleXADataSource')
 
     def testDataSourceCreate(self):
-        self.cg.processConfigItem(cmdDict={'JDBCProvider': {'classpath': '${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar', 'name': 'XAEVPSJDBCProvider', 'implementationClassName': 'oracle.jdbc.xa.client.OracleXADataSource', 'scope': '/Cell:cell01/', 'description': 'XAEVPSJDBCProvider', 'providerType': 'Oracle JDBC Driver (XA)', 'xa': 'true'}}, action='W')
-        self.cg.processConfigItem(cmdDict={'DataSource': {'name': 'Q5DataSource', 'datasourceHelperClassname': 'com.ibm.websphere.rsadapter.Oracle11gDataStoreHelper', 'statementCacheSize': '600', 'providerType': 'Oracle JDBC Driver (XA)', 'jndiName': 'weblogic.jdbc.jts.Q5DataSource', 'xaRecoveryAuthAlias': 'HP8200SWaymouthNode01/local_oracle_alias', 'authDataAlias': 'HP8200SWaymouthNode01/local_oracle_alias', 'description': 'Q5DataSource', 'scope': '/JDBCProvider:XAEVPSJDBCProvider/'}}, action='W')
-        self.jdbcprov = AdminConfig.getid('/JDBCProvider:XAEVPSJDBCProvider/')
+        self.cg.processConfigItem(cmdDict={'JDBCProvider': {'classpath': '${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar', 'name': 'DPSJDBCProvider', 'implementationClassName': 'oracle.jdbc.pool.OracleConnectionPoolDataSource', 'scope': '/Cell:cell01/', 'description': 'DPSJDBCProvider', 'providerType': 'Oracle JDBC Driver', 'xa': 'false'}}, action='W')
+        self.cg.processConfigItem(cmdDict={'DataSource': {'name': 'Q5DDLDataSource', 'datasourceHelperClassname': 'com.ibm.websphere.rsadapter.Oracle11gDataStoreHelper', 'statementCacheSize': '10', 'providerType': 'Oracle JDBC Driver', 'jndiName': 'weblogic.jdbc.jts.Q5DDLDataSource', 'xaRecoveryAuthAlias': 'node01/dps_oracle_alias', 'authDataAlias': 'node01/dps_oracle_alias', 'description': 'Q5DataSource', 'scope': '/JDBCProvider:DPSJDBCProvider/'}}, action='W')
+        self.cg.processPropertySet(cmdDict={'J2EEResourceProperty': {'name': 'useRRASetEquals', 'scope': '/DataSource:Q5DDLDataSource/', 'type': 'java.lang.String', 'value': 'true', 'required': 'false'}}, action='W')
+        self.cg.processPropertySet(cmdDict={'J2EEResourceProperty': {'name': 'transactionBranchesLooselyCoupled', 'scope': '/DataSource:Q5DDLDataSource/', 'type': 'java.lang.Boolean', 'value': 'true', 'required': 'false'}}, action='W')
+        self.cg.processPropertySet(cmdDict={'J2EEResourceProperty': {'name': 'validateNewConnection', 'scope': '/DataSource:Q5DDLDataSource/', 'type': 'java.lang.Boolean', 'value': 'true', 'required': 'false'}}, action='W')
+        self.cg.processPropertySet(cmdDict={'J2EEResourceProperty': {'name': 'validateNewConnectionRetryCount', 'scope': '/DataSource:Q5DDLDataSource/', 'type': 'java.lang.Integer', 'value': '5', 'required': 'false'}}, action='W')
+        self.cg.processPropertySet(cmdDict={'J2EEResourceProperty': {'name': 'validateNewConnectionRetryInterval', 'scope': '/DataSource:Q5DDLDataSource/', 'type': 'java.lang.Long', 'value': '5', 'required': 'false'}}, action='W')
+        self.cg.processNestedAttribute(cmdDict={'ConnectionPool': {'connectionTimeout': '300', 'maxConnections': '200', 'scope': '/DataSource:Q5DDLDataSource/', 'testConnectionInterval': '3', 'minConnections': '10', 'testConnection': 'true'}}, action='W')
+        self.jdbcprov = AdminConfig.getid('/JDBCProvider:DPSJDBCProvider/')
         self.implementationClassName=AdminConfig.showAttribute(self.jdbcprov, 'implementationClassName')
-        self.assertEqual(self.implementationClassName, 'oracle.jdbc.xa.client.OracleXADataSource')
+        self.assertEqual(self.implementationClassName, 'oracle.jdbc.pool.OracleConnectionPoolDataSource')
 
     def testJ2CActivationSpecCreate(self):
         self.cg.processConfigItem(cmdDict={'J2CActivationSpec': {'destinationJndiName': 'dovetail/jms/CacheUpdateTopic', 'name': 'CacheUpdateTopic', 'scope': '/Cell:cell01/', 'jndiName': 'jms/CacheUpdateTopic'}}, action='W')
+        self.cg.processPropertySet(cmdDict={'J2EEResourceProperty': {'name': 'busName', 'scope': '/J2CActivationSpec:CacheUpdateTopic/', 'type': 'java.lang.String', 'value': 'DovetailSIBus'}}, action='W')
         self.j2cas = AdminConfig.getid('/J2CActivationSpec:CacheUpdateTopic')
         self.destinationJndiName = AdminConfig.showAttribute(self.j2cas, 'destinationJndiName')
         self.assertEqual(self.destinationJndiName, 'dovetail/jms/CacheUpdateTopic')
@@ -389,7 +396,7 @@ class TestProcessCommandsBASE(unittest.TestCase):
 if __name__ == '__main__' or __name__ == 'main':
 
     #test suite that runs individual tests: use this for speed and enable only the tests you are develop[ing for.
-    #suite = unittest.TestSuite()
+    suite = unittest.TestSuite()
     #suite.addTest(TestProcessCommandsBASE('testJ2CActivationSpecCreate'))
     #suite.addTest(TestProcessCommandsBASE('testJ2CActivationSpecModify'))
     #suite.addTest(TestProcessCommandsBASE('testJ2CActivationSpecRead'))
@@ -398,11 +405,11 @@ if __name__ == '__main__' or __name__ == 'main':
     #suite.addTest(TestProcessCommandsBASE('testSIBModify'))
     #suite.addTest(TestProcessCommandsBASE('testSIBRead'))
     #suite.addTest(TestProcessCommandsBASE('testSIBTopicSpaceRead'))
-    #suite.addTest(TestProcessCommandsBASE('testNoCommandsException'))
-    #suite.addTest(TestProcessCommandsBASE('testGenerateCommands'))
+    #suite.addTest(TestProcessCommandsBASE('testDataSourceCreate'))
+    suite.addTest(TestProcessCommandsBASE('testGenerateCommands'))
     #suite.addTest(TestProcessCommandsBASE('testGenerateCommandsException'))
-    #unittest.TextTestRunner(verbosity=2).run(suite)
+    unittest.TextTestRunner(verbosity=2).run(suite)
 
     #Test suite to run everything.  Use this to sanity check all tests.
-    suite = unittest.TestLoader().loadTestsFromTestCase(TestProcessCommandsBASE)
-    unittest.TextTestRunner(verbosity=2).run(suite)
+    #suite = unittest.TestLoader().loadTestsFromTestCase(TestProcessCommandsBASE)
+    #unittest.TextTestRunner(verbosity=2).run(suite)

@@ -10,6 +10,7 @@ except:
 import re
 import sys
 from org.apache.log4j import *
+from com.ibm.ws.scripting import ScriptingException
 class ProcessCommands:
 
     logger = Logger.getLogger("ProcessCommands")
@@ -46,8 +47,8 @@ class ProcessCommands:
                 elif k == "Server":
                     self.logger.trace("generateCommands: block = Server")
                     self.processServer(cmdDict=cmdDict, action=action)
-                elif k == "DataSource" or k == "MQQueueConnectionFactory" or k == 'MQQueue' or k == "JDBCProvider" or k == 'J2CActivationSpec':
-                    self.logger.trace("generateCommands: block = JDBCProvider, DataSource, MQQueueConnectionFactory, MQQueue, J2CActivationSpec")
+                elif k == "DataSource" or k == "MQQueueConnectionFactory" or k == 'MQQueue' or k == "JDBCProvider" or k == 'J2CActivationSpec' or k == 'J2CAdminObject' or k == 'J2CConnectionFactory':
+                    self.logger.trace("generateCommands: block = JDBCProvider, DataSource, MQQueueConnectionFactory, MQQueue, J2CActivationSpec, J2CAdminObject, J2CConnectionFactory")
                     self.processConfigItem(cmdDict=cmdDict, action=action)
                 elif k == "J2EEResourceProperty":
                     self.logger.trace("generateCommands: block = J2EEResourceProperty")
@@ -174,8 +175,16 @@ class ProcessCommands:
                 if action == 'W':
                     if k == 'J2CActivationSpec':
                         self.logger.trace("processConfigItem: key is J2CActivationSpec so fixing attribute list")
-                        actspec = AdminConfig.list('ActivationSpec', AdminConfig.getid(v['scope']))
-                        attrList.append(['activationSpec', actspec])
+                        attr = AdminConfig.list('ActivationSpec', AdminConfig.getid(v['scope']))
+                        attrList.append(['activationSpec', attr])
+                    elif k == 'J2CAdminObject':
+                        self.logger.trace("processConfigItem: key is J2CAdminObject so fixing attribute list")
+                        attr = AdminConfig.list('AdminObject', AdminConfig.getid(v['scope']))
+                        attrList.append(['adminObject', attr])
+                    elif k == 'J2CConnectionFactory':
+                        self.logger.trace("processConfigItem: key is J2CConnectionFactory so fixing attribute list")
+                        attr = AdminConfig.list('ConnectionDefinition', AdminConfig.getid(v['scope']))
+                        attrList.append(['connectionDefinition', attr])
                     self.logger.info("processConfigItem: creating %s:%s:%s" % (AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'name'), k, v['name']))
                     self.logger.debug("processConfigItem: command=AdminConfig.create('%s', %s, %s)" % (k, AdminConfig.getid(v['scope']), attrList))
                     AdminConfig.create('%s' % k, AdminConfig.getid(v['scope']), attrList)
@@ -223,7 +232,14 @@ class ProcessCommands:
         v = cmdDict.values()[0]
         self.logger.trace("processPropertySet: key=%s, value=%s" % (k, v))
         self.validateScope(v, 'processPropertySet')
-        self.propSet=AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'propertySet')
+        self.propSet = None
+        try:
+            self.logger.trace("processPropertySet: locating property set...")
+            self.propSet=AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'propertySet')
+            self.logger.trace("processPropertySet: property set found.")
+        except ScriptingException, msg:
+            self.logger.trace("processPropertySet: msg=%s" % msg)
+            self.logger.trace("processPropertySet: property set not found.")
         self.logger.trace("processPropertySet: propSet=%s " % self.propSet)
         self.propList = AdminConfig.list(k, AdminConfig.getid(v['scope'])).split('\r\n')
         for key in v.keys():
@@ -251,9 +267,12 @@ class ProcessCommands:
                     #end-if
                 #end-for
                 if itemFound == "1":
-                    self.logger.info("processPropertySet: creating %s:%s:%s=%s" % (AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'name'), AdminConfig.showAttribute(item, 'name'), 'value', v['value']))
-                    self.logger.debug("processPropertySet: command=AdminConfig.create(k, self.propSet, [['name', '%s'],['type', '%s'],['value', '%s'],['required', '%s'])" % (v[key], v['type'], v['value'], v['required']))
-                    AdminConfig.create(k, self.propSet, [['name', v[key]],['type', v['type']],['value', v['value']],['required', v['required']]])
+                    if self.propSet != None:
+                        self.logger.info("processPropertySet: creating %s:%s:%s=%s" % (AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'name'), v[key], 'value', v['value']))
+                        self.logger.debug("processPropertySet: command=AdminConfig.create(%s, %s, [['name', '%s'],['type', '%s'],['value', '%s'],['required', '%s'])" % (k, self.propSet, v[key], v['type'], v['value'], v['required']))
+                        AdminConfig.create(k, self.propSet, [['name', v[key]],['type', v['type']],['value', v['value']],['required', v['required']]])
+                    else:
+                        self.logger.ERROR("processPropertySet: You tried to create a new property but the configuration does not have a property set.  You will need to to write some code to deal with this because I haven't done it yet :-)")
                 #end-if
             #end-if
         #end-for
@@ -347,7 +366,7 @@ class ProcessCommands:
         self.method=method
         key=key
         self.logger.trace("validateScope: key=%s" % key)
-        if key == 'J2CActivationSpec':
+        if key == 'J2CActivationSpec' or key == 'J2CAdminObject' or key == 'J2CConnectionFactory':
             valueDict['scope'] = ('%sJ2CResourceAdapter:SIB JMS Resource Adapter/' % valueDict['scope'])
             self.logger.trace("validateScope: Adjusting Scope for resource provider=%s" % valueDict['scope'])
         elif key == 'MQQueueConnectionFactory':
@@ -357,6 +376,7 @@ class ProcessCommands:
             valueDict['scope'] = ('%sJMSProvider:WebSphere MQ JMS Provider/' % valueDict['scope'])
             self.logger.trace("validateScope: Adjusting Scope for messaging provider=%s" % valueDict['scope'])
         self.scope = AdminConfig.getid(valueDict['scope'])
+        self.logger.trace("validateScope:%s self.scope=%s" % (self.method, self.scope))
         if self.scope == "":
             self.logger.error("validateScope:%s Scope %s does not exist.  The object may not have been created yet or the scope in the configuration file is incorrect." % (self.method, valueDict['scope']))
             raise ProcessCommandException("Scope %s does not exist.  The object may not have been created yet or the scope in the configuration file is incorrect." % valueDict['scope'])
@@ -365,9 +385,18 @@ class ProcessCommands:
         template = None
         if key == 'DataSource':
             if valueDict['providerType'] == 'Oracle JDBC Driver (XA)':
+                self.logger.trace("setTemplate: Oracle JDBC Driver DataSource")
                 template = AdminConfig.listTemplates('DataSource', "Oracle JDBC Driver XA DataSource")
             else:
+                self.logger.trace("setTemplate: Oracle JDBC Driver DataSource")
                 template = AdminConfig.listTemplates('DataSource', "Oracle JDBC Driver DataSource")
+        elif key == 'JDBCProvider':
+            if valueDict['providerType'] == 'Oracle JDBC Driver (XA)':
+                self.logger.trace("setTemplate: Oracle JDBC Driver Provider Only (XA)")
+                template = AdminConfig.listTemplates('JDBCProvider', 'Oracle JDBC Driver Provider Only (XA)')
+            else:
+                self.logger.trace("setTemplate: Oracle JDBC Driver Provider Only")
+                template = 'Oracle JDBC Driver Provider Only(templates/system|jdbc-resource-provider-only-templates.xml#JDBCProvider_Oracle_5)'
         elif key == 'MQQueueConnectionFactory':
             template = AdminConfig.listTemplates('MQQueueConnectionFactory', 'First Example WMQ QueueConnectionFactory')
         elif key == 'MQQueue':
