@@ -93,6 +93,9 @@ class TestProcessCommandsBASE(unittest.TestCase):
                 #print name
                 if name == 'DovetailSIBus':
                     AdminTask.deleteSIBus(['-bus %s' % name])
+        self.j2cas = AdminConfig.getid('/J2CActivationSpec:CacheUpdateTopic/')
+        if self.j2cas != '':
+            AdminConfig.remove(self.j2cas)
 
     def testNoCommandsException(self):
         cmdList = None
@@ -363,12 +366,34 @@ class TestProcessCommandsBASE(unittest.TestCase):
         self.implementationClassName=AdminConfig.showAttribute(self.jdbcprov, 'implementationClassName')
         self.assertEqual(self.implementationClassName, 'oracle.jdbc.xa.client.OracleXADataSource')
 
+    def testJ2CActivationSpecCreate(self):
+        self.cg.processConfigItem(cmdDict={'J2CActivationSpec': {'destinationJndiName': 'dovetail/jms/CacheUpdateTopic', 'name': 'CacheUpdateTopic', 'scope': '/Cell:cell01/', 'jndiName': 'jms/CacheUpdateTopic'}}, action='W')
+        self.j2cas = AdminConfig.getid('/J2CActivationSpec:CacheUpdateTopic')
+        self.destinationJndiName = AdminConfig.showAttribute(self.j2cas, 'destinationJndiName')
+        self.assertEqual(self.destinationJndiName, 'dovetail/jms/CacheUpdateTopic')
+
+    def testJ2CActivationSpecModify(self):
+        self.cg.processConfigItem(cmdDict={'J2CActivationSpec': {'destinationJndiName': 'dovetail/jms/CacheUpdateTopic', 'name': 'CacheUpdateTopic', 'scope': '/Cell:cell01/', 'jndiName': 'jms/CacheUpdateTopic'}}, action='W')
+        self.cg.processConfigItem(cmdDict={'J2CActivationSpec': {'destinationJndiName': 'dovetail/jms/CacheUpdateTopic1', 'name': 'CacheUpdateTopic', 'scope': '/Cell:cell01/', 'jndiName': 'jms/CacheUpdateTopic'}}, action='W')
+        self.j2cas = AdminConfig.getid('/J2CActivationSpec:CacheUpdateTopic')
+        self.destinationJndiName = AdminConfig.showAttribute(self.j2cas, 'destinationJndiName')
+        self.assertEqual(self.destinationJndiName, 'dovetail/jms/CacheUpdateTopic1')
+
+    def testJ2CActivationSpecRead(self):
+        self.cg.processConfigItem(cmdDict={'J2CActivationSpec': {'destinationJndiName': 'dovetail/jms/CacheUpdateTopic', 'name': 'CacheUpdateTopic', 'scope': '/Cell:cell01/', 'jndiName': 'jms/CacheUpdateTopic'}}, action='W')
+        self.cg.processConfigItem(cmdDict={'J2CActivationSpec': {'destinationJndiName': 'dovetail/jms/CacheUpdateTopic1', 'name': 'CacheUpdateTopic', 'scope': '/Cell:cell01/', 'jndiName': 'jms/CacheUpdateTopic'}})
+        self.j2cas = AdminConfig.getid('/J2CActivationSpec:CacheUpdateTopic')
+        self.destinationJndiName = AdminConfig.showAttribute(self.j2cas, 'destinationJndiName')
+        self.assertEqual(self.destinationJndiName, 'dovetail/jms/CacheUpdateTopic')
+
 if __name__ == '__main__' or __name__ == 'main':
 
     #test suite that runs individual tests: use this for speed and enable only the tests you are develop[ing for.
     #suite = unittest.TestSuite()
-    #suite.addTest(TestProcessCommandsBASE('testSIBCreate'))
-    #suite.addTest(TestProcessCommandsBASE('testSIBModify'))
+    #suite.addTest(TestProcessCommandsBASE('testJ2CActivationSpecCreate'))
+    #suite.addTest(TestProcessCommandsBASE('testJ2CActivationSpecModify'))
+    #suite.addTest(TestProcessCommandsBASE('testJ2CActivationSpecRead'))
+    #suite.addTest(TestProcessCommandsBASE('testMQQCFCreate'))
     #suite.addTest(TestProcessCommandsBASE('testSIBTopicSpaceModify'))
     #suite.addTest(TestProcessCommandsBASE('testSIBModify'))
     #suite.addTest(TestProcessCommandsBASE('testSIBRead'))

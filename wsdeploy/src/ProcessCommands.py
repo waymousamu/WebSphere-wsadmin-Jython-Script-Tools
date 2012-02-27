@@ -46,8 +46,8 @@ class ProcessCommands:
                 elif k == "Server":
                     self.logger.trace("generateCommands: block = Server")
                     self.processServer(cmdDict=cmdDict, action=action)
-                elif k == "DataSource" or k == "MQQueueConnectionFactory" or k == 'MQQueue' or k == "JDBCProvider":
-                    self.logger.trace("generateCommands: block = JDBCProvider, DataSource, MQQueueConnectionFactory, MQQueue")
+                elif k == "DataSource" or k == "MQQueueConnectionFactory" or k == 'MQQueue' or k == "JDBCProvider" or k == 'J2CActivationSpec':
+                    self.logger.trace("generateCommands: block = JDBCProvider, DataSource, MQQueueConnectionFactory, MQQueue, J2CActivationSpec")
                     self.processConfigItem(cmdDict=cmdDict, action=action)
                 elif k == "J2EEResourceProperty":
                     self.logger.trace("generateCommands: block = J2EEResourceProperty")
@@ -64,7 +64,7 @@ class ProcessCommands:
                 elif k == 'SIBus' or k == 'SIBusMember' or k == 'SIBTopicSpace':
                     self.logger.trace("generateCommands: block = SIBus, SIBusMember, SIBTopicSpace")
                     self.processAdminTask(cmdDict=cmdDict, action=action)
-                elif k == "env" or k == "Node" or k == 'dmgr' or k == 'JMSProvider':
+                elif k == "env" or k == "Node" or k == 'dmgr' or k == 'JMSProvider' or k == 'J2CResourceAdapter':
                     self.logger.trace("generateCommands: block = env, Node, dmgr")
                     '''Ignore a tag'''
                     self.logger.debug("generateCommands: ignoring tag %s" % k )
@@ -154,9 +154,10 @@ class ProcessCommands:
         self.logger.trace("processConfigItem: key=%s, value=%s" % (k, v))
         template = self.setTemplate(key=k, valueDict=v)
         self.logger.trace("processConfigItem: template=%s" % template)
-        self.validateScope(valueDict=v, method='processConfigItem')
+        self.validateScope(valueDict=v, method='processConfigItem', key=k)
         self.logger.trace("processConfigItem: scope=%s " % AdminConfig.getid(v['scope']))
-        obj = AdminConfig.getid('%s%s:%s' % (v['scope'], k, v['name']))
+        self.logger.trace("processConfigItem: finding object command=AdminConfig.getid('/%s:%s/') " % (k, v['name']))
+        obj = AdminConfig.getid('/%s:%s/' % (k, v['name']))
         self.logger.trace("processConfigItem: obj=%s " % obj)
         if obj == "":
             self.logger.trace("processConfigItem: obj not found, creating...")
@@ -169,21 +170,25 @@ class ProcessCommands:
             self.logger.trace("processConfigItem: attrList=%s" % attrList)
             self.logger.trace("processConfigItem: template=%s" % template)
             if template == None:
-                self.logger.trace("processConfigItem: template was found...")
+                self.logger.trace("processConfigItem: template was not found...")
                 if action == 'W':
+                    if k == 'J2CActivationSpec':
+                        self.logger.trace("processConfigItem: key is J2CActivationSpec so fixing attribute list")
+                        actspec = AdminConfig.list('ActivationSpec', AdminConfig.getid(v['scope']))
+                        attrList.append(['activationSpec', actspec])
                     self.logger.info("processConfigItem: creating %s:%s:%s" % (AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'name'), k, v['name']))
-                    self.logger.debug("processConfigItem: command=AdminConfig.create(%s, %s, %s)" % (k, AdminConfig.getid(v['scope']), attrList))
-                    AdminConfig.create(k, AdminConfig.getid(v['scope']), attrList)
+                    self.logger.debug("processConfigItem: command=AdminConfig.create('%s', %s, %s)" % (k, AdminConfig.getid(v['scope']), attrList))
+                    AdminConfig.create('%s' % k, AdminConfig.getid(v['scope']), attrList)
                 else:
                     self.logger.warn("processConfigItem: action is set to %s.  Item %s:%s:%s will not be created.  Attribute and properties for this object will not exist and may cause failures in this script." % (action, AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'name'), k, v['name']))
                 #end-if
             else:
-                self.logger.trace("processConfigItem: template not found...")
+                self.logger.trace("processConfigItem: template was found...")
                 if action == 'W':
                     self.logger.info("processConfigItem: creating %s:%s:%s" % (AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'name'), k, v['name']))
                     self.logger.trace("processConfigItem: template=%s" % template)
-                    self.logger.debug("processConfigItem: command=AdminConfig.createUsingTemplate(%s, %s, %s, %s)" % (k, AdminConfig.getid(v['scope']), attrList, template))
-                    AdminConfig.createUsingTemplate(k, AdminConfig.getid(v['scope']), attrList, template)
+                    self.logger.debug("processConfigItem: command=AdminConfig.createUsingTemplate('%s', %s, %s, %s)" % (k, AdminConfig.getid(v['scope']), attrList, template))
+                    AdminConfig.createUsingTemplate('%s' % k, AdminConfig.getid(v['scope']), attrList, template)
                 else:
                     self.logger.warn("processConfigItem: action is set to %s.  Item %s:%s:%s will not be created.  Attribute and properties for this object will not exist and may cause failures in this script." % (action, AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'name'), k, v['name']))
                 #end-if
@@ -337,9 +342,20 @@ class ProcessCommands:
             raise ProcessCommandException("key and value parameters were not suppled to the method.")
         #end-if
 
-    def validateScope(self, valueDict=None, method=None):
+    def validateScope(self, valueDict=None, method=None, key=None):
         self.valueDict=valueDict
         self.method=method
+        key=key
+        self.logger.trace("validateScope: key=%s" % key)
+        if key == 'J2CActivationSpec':
+            valueDict['scope'] = ('%sJ2CResourceAdapter:SIB JMS Resource Adapter/' % valueDict['scope'])
+            self.logger.trace("validateScope: Adjusting Scope for resource provider=%s" % valueDict['scope'])
+        elif key == 'MQQueueConnectionFactory':
+            valueDict['scope'] = ('%sJMSProvider:WebSphere MQ JMS Provider/' % valueDict['scope'])
+            self.logger.trace("validateScope: Adjusting Scope for messaging provider=%s" % valueDict['scope'])
+        elif key == 'MQQueue':
+            valueDict['scope'] = ('%sJMSProvider:WebSphere MQ JMS Provider/' % valueDict['scope'])
+            self.logger.trace("validateScope: Adjusting Scope for messaging provider=%s" % valueDict['scope'])
         self.scope = AdminConfig.getid(valueDict['scope'])
         if self.scope == "":
             self.logger.error("validateScope:%s Scope %s does not exist.  The object may not have been created yet or the scope in the configuration file is incorrect." % (self.method, valueDict['scope']))
@@ -354,12 +370,8 @@ class ProcessCommands:
                 template = AdminConfig.listTemplates('DataSource', "Oracle JDBC Driver DataSource")
         elif key == 'MQQueueConnectionFactory':
             template = AdminConfig.listTemplates('MQQueueConnectionFactory', 'First Example WMQ QueueConnectionFactory')
-            valueDict['scope'] = ('%sJMSProvider:WebSphere MQ JMS Provider/' % valueDict['scope'])
-            self.logger.trace("setTemplate: Adjusting Scope for messaging provider=%s" % valueDict['scope'])
         elif key == 'MQQueue':
             template = AdminConfig.listTemplates('MQQueue', 'Example.JMS.WMQ.Q1')
-            valueDict['scope'] = ('%sJMSProvider:WebSphere MQ JMS Provider/' % valueDict['scope'])
-            self.logger.trace("setTemplate: Adjusting Scope for messaging provider=%s" % valueDict['scope'])
         self.logger.trace("setTemplate: template=%s" % template)
         return template
 

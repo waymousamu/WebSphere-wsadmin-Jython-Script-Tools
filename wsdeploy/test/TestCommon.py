@@ -39,7 +39,16 @@ CONFDICT_BASE = [
                  {'MQQueue': {'name': 'AccountingHVMessageSendQueue', 'baseQueueName': 'AccountingHVMessageSendQueue', 'serverConnectionChannelName': 'CH1', 'baseQueueManagerName': 'QM1', 'jndiName': 'dovetail/jms/AccountingHVMessageSendQueue', 'queueManagerHost': 'localhost', 'persistence': 'PERSISTENT', 'scope': '/Cell:cell01/', 'queueManagerPort': '1414'}},
                  {'SIBus': {'name': 'DovetailSIBus', 'scope': '/Cell:cell01/'}},
                  {'SIBusMember': {'scope': '/SIBus:DovetailSIBus/', 'node': 'node01', 'server': 'srv01'}},
-                 {'SIBTopicSpace': {'identifier': 'CacheUpdateTopic', 'scope': '/SIBus:DovetailSIBus/', 'topicAccessCheckRequired': 'false', 'node': 'node01', 'server': 'srv01'}}
+                 {'SIBTopicSpace': {'identifier': 'CacheUpdateTopic', 'scope': '/SIBus:DovetailSIBus/', 'topicAccessCheckRequired': 'false', 'node': 'node01', 'server': 'srv01'}},
+                 {'J2CResourceAdapter': {'name': 'SIB JMS Resource Adapter', 'scope': '/Cell:cell01/'}},
+                 {'J2CActivationSpec': {'destinationJndiName': 'dovetail/jms/CacheUpdateTopic', 'name': 'CacheUpdateTopic', 'scope': '/J2CResourceAdapter:SIB JMS Resource Adapter/', 'jndiName': 'jms/CacheUpdateTopic'}},
+                 {'J2EEResourceProperty': {'name': 'busName', 'scope': '/J2CActivationSpec:CacheUpdateTopic/', 'type': 'java.lang.String', 'value': 'DovetailSIBus'}},
+                 {'J2EEResourceProperty': {'name': 'destinationType', 'scope': '/J2CActivationSpec:CacheUpdateTopic/', 'type': 'java.lang.String', 'value': 'javax.jms.Topic', 'required': 'true'}},
+                 {'J2EEResourceProperty': {'name': 'alwaysActivateAllMDBs', 'scope': '/J2CActivationSpec:CacheUpdateTopic/', 'type': 'java.lang.Boolean', 'value': 'true', 'required': 'false'}},
+                 {'J2CAdminObject': {'name': 'CacheUpdateTopic', 'scope': '/J2CResourceAdapter:SIB JMS Resource Adapter/', 'jndiName': 'dovetail/jms/CacheUpdateTopic'}},
+                 {'J2EEResourceProperty': {'name': 'BusName', 'scope': '/J2CAdminObject:CacheUpdateTopic/', 'type': 'java.lang.String', 'value': 'DovetailSIBus'}},
+                 {'J2EEResourceProperty': {'name': 'TopicName', 'scope': '/J2CAdminObject:CacheUpdateTopic/', 'type': 'java.lang.String', 'value': 'CacheUpdateTopic'}},
+                 {'J2EEResourceProperty': {'name': 'TopicSpace', 'scope': '/J2CAdminObject:CacheUpdateTopic/', 'type': 'java.lang.String', 'value': 'CacheUpdateTopic'}}
                  ]
 
 CONFXML_BASE = """
