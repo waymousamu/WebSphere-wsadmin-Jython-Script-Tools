@@ -393,6 +393,13 @@ class TestProcessCommandsBASE(unittest.TestCase):
         self.destinationJndiName = AdminConfig.showAttribute(self.j2cas, 'destinationJndiName')
         self.assertEqual(self.destinationJndiName, 'dovetail/jms/CacheUpdateTopic')
 
+    def testEJBContainerModify(self):
+        self.cg.processNestedAttribute(cmdDict={'EJBCache': {'cleanupInterval': '0', 'scope': '/Server:srv01/', 'cacheSize': '2000'}}, action='W')
+        self.srv = AdminConfig.getid('/Server:srv01/')
+        self.ejbc = AdminConfig.list('EJBCache', self.srv)
+        self.cacheSize=AdminConfig.showAttribute(self.ejbc, 'cacheSize')
+        self.assertEqual(self.cacheSize, '2000')
+
 if __name__ == '__main__' or __name__ == 'main':
 
     #test suite that runs individual tests: use this for speed and enable only the tests you are develop[ing for.
@@ -405,7 +412,7 @@ if __name__ == '__main__' or __name__ == 'main':
     #suite.addTest(TestProcessCommandsBASE('testSIBModify'))
     #suite.addTest(TestProcessCommandsBASE('testSIBRead'))
     #suite.addTest(TestProcessCommandsBASE('testSIBTopicSpaceRead'))
-    #suite.addTest(TestProcessCommandsBASE('testDataSourceCreate'))
+    #suite.addTest(TestProcessCommandsBASE('testEJBContainerModify'))
     suite.addTest(TestProcessCommandsBASE('testGenerateCommands'))
     #suite.addTest(TestProcessCommandsBASE('testGenerateCommandsException'))
     unittest.TextTestRunner(verbosity=2).run(suite)
