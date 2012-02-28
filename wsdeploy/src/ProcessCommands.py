@@ -46,25 +46,25 @@ class ProcessCommands:
                     '''IMPLEMENT ME'''
                 elif k == "Server":
                     self.logger.trace("generateCommands: block = Server")
-                    self.processServer(cmdDict=cmdDict, action=action)
+                    self.processServer(cmdDict=cmdDict, action=self.action)
                 elif k == "DataSource" or k == "MQQueueConnectionFactory" or k == 'MQQueue' or k == "JDBCProvider" or k == 'J2CActivationSpec' or k == 'J2CAdminObject' or k == 'J2CConnectionFactory':
                     self.logger.trace("generateCommands: block = JDBCProvider, DataSource, MQQueueConnectionFactory, MQQueue, J2CActivationSpec, J2CAdminObject, J2CConnectionFactory")
-                    self.processConfigItem(cmdDict=cmdDict, action=action)
+                    self.processConfigItem(cmdDict=cmdDict, action=self.action)
                 elif k == "J2EEResourceProperty":
                     self.logger.trace("generateCommands: block = J2EEResourceProperty")
-                    self.processPropertySet(cmdDict=cmdDict, action=action)
+                    self.processPropertySet(cmdDict=cmdDict, action=self.action)
                 elif k == "JAASAuthData":
                     self.logger.trace("generateCommands: block = JAASAuthData")
-                    self.processSecurity(cmdDict=cmdDict, action=action)
+                    self.processSecurity(cmdDict=cmdDict, action=self.action)
                 elif k == "ConnectionPool" or k == "connectionPool" or k == "sessionPool" or k == 'EJBCache':
                     self.logger.trace("generateCommands: block = ConnectionPool, connectionPool, sessionPool")
-                    self.processNestedAttribute(cmdDict=cmdDict, action=action)
+                    self.processNestedAttribute(cmdDict=cmdDict, action=self.action)
                 elif k == "JavaVirtualMachine" or k == "ProcessExecution":
                     self.logger.trace("generateCommands: block = JavaVirtualMachine, ProcessExecution")
-                    self.processNestedAttribute(cmdDict=cmdDict, action=action)
+                    self.processNestedAttribute(cmdDict=cmdDict, action=self.action)
                 elif k == 'SIBus' or k == 'SIBusMember' or k == 'SIBTopicSpace' or k == 'SIBQueue':
                     self.logger.trace("generateCommands: block = SIBus, SIBusMember, SIBTopicSpace, SIBQueue")
-                    self.processAdminTask(cmdDict=cmdDict, action=action)
+                    self.processAdminTask(cmdDict=cmdDict, action=self.action)
                 elif k == "env" or k == "Node" or k == 'dmgr' or k == 'JMSProvider' or k == 'J2CResourceAdapter':
                     self.logger.trace("generateCommands: block = env, Node, dmgr")
                     '''Ignore a tag'''
@@ -117,31 +117,35 @@ class ProcessCommands:
         k = cmdDict.keys()[0]
         v = cmdDict.values()[0]
         self.logger.trace("processNestedAttribute: key=%s, value=%s" % (k, v))
-        self.validateScope(v, 'processNestedAttribute')
-        attribute = None
-        if re.match("[a-z]", k):
-            self.logger.trace("processNestedAttribute: %s is a nested property." % k)
-            attribute=AdminConfig.showAttribute(AdminConfig.getid(v['scope']), k)
+        try:
+            self.validateScope(v, 'processNestedAttribute')
+        except ProcessCommandException:
+            self.logger.info("processNestedAttribute: Skipping NestedAttribute %s:%s" % (k, v))
         else:
-            attribute = AdminConfig.list('%s' % k, AdminConfig.getid(v['scope']))
-            self.logger.trace("processNestedAttribute: %s is an object." % k)
-        #end-if
-        for (k2, v2) in v.items():
-            if k2 != "scope":
-                actualValue=AdminConfig.showAttribute(attribute, k2)
-                if actualValue != v2:
-                    if action == 'W':
-                        self.logger.info("processNestedAttribute: modifying %s%s:%s=%s" % (v['scope'], k, k2, v2))
-                        self.logger.debug("processNestedAttribute: command=AdminConfig.modify(attribute, [[%s, %s]])" % (k2, v2))
-                        AdminConfig.modify(attribute, [[k2, v2]])
-                    else:
-                        self.logger.warn("processNestedAttribute: audit failure %s%s:%s, actual=%s config=%s" % (v['scope'], k, k2, actualValue, v2))
-                    #end-if
-                else:
-                    self.logger.debug("processNestedAttribute: ignoring %s%s:%s=%s" % (v['scope'], k, k2, v2))
-                #end-if
+            attribute = None
+            if re.match("[a-z]", k):
+                self.logger.trace("processNestedAttribute: %s is a nested property." % k)
+                attribute=AdminConfig.showAttribute(AdminConfig.getid(v['scope']), k)
+            else:
+                attribute = AdminConfig.list('%s' % k, AdminConfig.getid(v['scope']))
+                self.logger.trace("processNestedAttribute: %s is an object." % k)
             #end-if
-        #end-for
+            for (k2, v2) in v.items():
+                if k2 != "scope":
+                    actualValue=AdminConfig.showAttribute(attribute, k2)
+                    if actualValue != v2:
+                        if action == 'W':
+                            self.logger.info("processNestedAttribute: modifying %s%s:%s=%s" % (v['scope'], k, k2, v2))
+                            self.logger.debug("processNestedAttribute: command=AdminConfig.modify(attribute, [[%s, %s]])" % (k2, v2))
+                            AdminConfig.modify(attribute, [[k2, v2]])
+                        else:
+                            self.logger.warn("processNestedAttribute: audit failure %s%s:%s, actual=%s config=%s" % (v['scope'], k, k2, actualValue, v2))
+                        #end-if
+                    else:
+                        self.logger.debug("processNestedAttribute: ignoring %s%s:%s=%s" % (v['scope'], k, k2, v2))
+                    #end-if
+                #end-if
+            #end-for
 
     def processConfigItem(self, cmdDict=None, action=None):
         '''processConfigItem: This method processes a single configuration object. It takes two parameters, a dictionary containing the command and the action (RW)'''
@@ -155,71 +159,75 @@ class ProcessCommands:
         self.logger.trace("processConfigItem: key=%s, value=%s" % (k, v))
         template = self.setTemplate(key=k, valueDict=v)
         self.logger.trace("processConfigItem: template=%s" % template)
-        self.validateScope(valueDict=v, method='processConfigItem', key=k)
-        self.logger.trace("processConfigItem: scope=%s " % AdminConfig.getid(v['scope']))
-        self.logger.trace("processConfigItem: finding object command=AdminConfig.getid('/%s:%s/') " % (k, v['name']))
-        obj = AdminConfig.getid('/%s:%s/' % (k, v['name']))
-        self.logger.trace("processConfigItem: obj=%s " % obj)
-        if obj == "":
-            self.logger.trace("processConfigItem: obj not found, creating...")
-            attrList = []
-            for key in v.keys():
-                if key != 'scope':
-                    attrList.append([key, v[key]])
-                #end-if
-            #end-for
-            self.logger.trace("processConfigItem: attrList=%s" % attrList)
-            self.logger.trace("processConfigItem: template=%s" % template)
-            if template == None:
-                self.logger.trace("processConfigItem: template was not found...")
-                if action == 'W':
-                    if k == 'J2CActivationSpec':
-                        self.logger.trace("processConfigItem: key is J2CActivationSpec so fixing attribute list")
-                        attr = AdminConfig.list('ActivationSpec', AdminConfig.getid(v['scope']))
-                        attrList.append(['activationSpec', attr])
-                    elif k == 'J2CAdminObject':
-                        self.logger.trace("processConfigItem: key is J2CAdminObject so fixing attribute list")
-                        attr = AdminConfig.list('AdminObject', AdminConfig.getid(v['scope']))
-                        attrList.append(['adminObject', attr])
-                    elif k == 'J2CConnectionFactory':
-                        self.logger.trace("processConfigItem: key is J2CConnectionFactory so fixing attribute list")
-                        attr = AdminConfig.list('ConnectionDefinition', AdminConfig.getid(v['scope']))
-                        attrList.append(['connectionDefinition', attr])
-                    self.logger.info("processConfigItem: creating %s:%s:%s" % (AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'name'), k, v['name']))
-                    self.logger.debug("processConfigItem: command=AdminConfig.create('%s', %s, %s)" % (k, AdminConfig.getid(v['scope']), attrList))
-                    AdminConfig.create('%s' % k, AdminConfig.getid(v['scope']), attrList)
-                else:
-                    self.logger.warn("processConfigItem: action is set to %s.  Item %s:%s:%s will not be created.  Attribute and properties for this object will not exist and may cause failures in this script." % (action, AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'name'), k, v['name']))
-                #end-if
-            else:
-                self.logger.trace("processConfigItem: template was found...")
-                if action == 'W':
-                    self.logger.info("processConfigItem: creating %s:%s:%s" % (AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'name'), k, v['name']))
-                    self.logger.trace("processConfigItem: template=%s" % template)
-                    self.logger.debug("processConfigItem: command=AdminConfig.createUsingTemplate('%s', %s, %s, %s)" % (k, AdminConfig.getid(v['scope']), attrList, template))
-                    AdminConfig.createUsingTemplate('%s' % k, AdminConfig.getid(v['scope']), attrList, template)
-                else:
-                    self.logger.warn("processConfigItem: action is set to %s.  Item %s:%s:%s will not be created.  Attribute and properties for this object will not exist and may cause failures in this script." % (action, AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'name'), k, v['name']))
-                #end-if
-            #end-if
-        #end-if
+        try:
+            self.validateScope(valueDict=v, method='processConfigItem', key=k)
+        except ProcessCommandException:
+            self.logger.info("processConfigItem: Skipping ConfigItem %s:%s." % (k, v))
         else:
-            for key in v.keys():
-                if key != 'scope':
-                    actual = AdminConfig.showAttribute(obj, key)
-                    self.logger.trace("processConfigItem: attribute=%s, value=%s" % (key, actual))
-                    if actual != v[key]:
-                        if action == 'W':
-                            self.logger.info("processConfigItem: modifying actual=%s to %s" % (actual,v[key]))
-                            self.logger.debug("processConfigItem: command=AdminConfig.modify(%s, [['%s', '%s']])" % (obj, key, v[key]))
-                            AdminConfig.modify(obj, [[key, v[key]]])
-                        else:
-                            self.logger.warn("processPropertySet: audit failure %s:%s, actual=%s config=%s" % (AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'name'), (AdminConfig.showAttribute(obj, 'name')), (AdminConfig.showAttribute(obj, key)), v[key]))
-                        #end-if
+            self.logger.trace("processConfigItem: scope=%s " % AdminConfig.getid(v['scope']))
+            self.logger.trace("processConfigItem: finding object command=AdminConfig.getid('/%s:%s/') " % (k, v['name']))
+            obj = AdminConfig.getid('/%s:%s/' % (k, v['name']))
+            self.logger.trace("processConfigItem: obj=%s " % obj)
+            if obj == "":
+                self.logger.trace("processConfigItem: obj not found, creating...")
+                attrList = []
+                for key in v.keys():
+                    if key != 'scope':
+                        attrList.append([key, v[key]])
+                    #end-if
+                #end-for
+                self.logger.trace("processConfigItem: attrList=%s" % attrList)
+                self.logger.trace("processConfigItem: template=%s" % template)
+                if template == None:
+                    self.logger.trace("processConfigItem: template was not found...")
+                    if action == 'W':
+                        if k == 'J2CActivationSpec':
+                            self.logger.trace("processConfigItem: key is J2CActivationSpec so fixing attribute list")
+                            attr = AdminConfig.list('ActivationSpec', AdminConfig.getid(v['scope']))
+                            attrList.append(['activationSpec', attr])
+                        elif k == 'J2CAdminObject':
+                            self.logger.trace("processConfigItem: key is J2CAdminObject so fixing attribute list")
+                            attr = AdminConfig.list('AdminObject', AdminConfig.getid(v['scope']))
+                            attrList.append(['adminObject', attr])
+                        elif k == 'J2CConnectionFactory':
+                            self.logger.trace("processConfigItem: key is J2CConnectionFactory so fixing attribute list")
+                            attr = AdminConfig.list('ConnectionDefinition', AdminConfig.getid(v['scope']))
+                            attrList.append(['connectionDefinition', attr])
+                        self.logger.info("processConfigItem: creating %s:%s:%s" % (AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'name'), k, v['name']))
+                        self.logger.debug("processConfigItem: command=AdminConfig.create('%s', %s, %s)" % (k, AdminConfig.getid(v['scope']), attrList))
+                        AdminConfig.create('%s' % k, AdminConfig.getid(v['scope']), attrList)
+                    else:
+                        self.logger.warn("processConfigItem: action is set to %s.  Item %s:%s:%s will not be created.  Attribute and properties for this object will not exist and may cause failures in this script." % (action, AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'name'), k, v['name']))
+                    #end-if
+                else:
+                    self.logger.trace("processConfigItem: template was found...")
+                    if action == 'W':
+                        self.logger.info("processConfigItem: creating %s:%s:%s" % (AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'name'), k, v['name']))
+                        self.logger.trace("processConfigItem: template=%s" % template)
+                        self.logger.debug("processConfigItem: command=AdminConfig.createUsingTemplate('%s', %s, %s, %s)" % (k, AdminConfig.getid(v['scope']), attrList, template))
+                        AdminConfig.createUsingTemplate('%s' % k, AdminConfig.getid(v['scope']), attrList, template)
+                    else:
+                        self.logger.warn("processConfigItem: action is set to %s.  Item %s:%s:%s will not be created.  Attribute and properties for this object will not exist and may cause failures in this script." % (action, AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'name'), k, v['name']))
                     #end-if
                 #end-if
-            #end-for
-        #end-if
+            #end-if
+            else:
+                for key in v.keys():
+                    if key != 'scope':
+                        actual = AdminConfig.showAttribute(obj, key)
+                        self.logger.trace("processConfigItem: attribute=%s, value=%s" % (key, actual))
+                        if actual != v[key]:
+                            if action == 'W':
+                                self.logger.info("processConfigItem: modifying actual=%s to %s" % (actual,v[key]))
+                                self.logger.debug("processConfigItem: command=AdminConfig.modify(%s, [['%s', '%s']])" % (obj, key, v[key]))
+                                AdminConfig.modify(obj, [[key, v[key]]])
+                            else:
+                                self.logger.warn("processPropertySet: audit failure %s:%s, actual=%s config=%s" % (AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'name'), (AdminConfig.showAttribute(obj, 'name')), (AdminConfig.showAttribute(obj, key)), v[key]))
+                            #end-if
+                        #end-if
+                    #end-if
+                #end-for
+            #end-if
 
     def processPropertySet(self, cmdDict=None, action=None):
         '''processPropertySet: This method processes a single configuration object. It takes two parameters, a dictionary containing the command and the action (RW)'''
@@ -231,51 +239,55 @@ class ProcessCommands:
         k = cmdDict.keys()[0]
         v = cmdDict.values()[0]
         self.logger.trace("processPropertySet: key=%s, value=%s" % (k, v))
-        self.validateScope(v, 'processPropertySet')
-        self.propSet = None
         try:
-            self.logger.trace("processPropertySet: locating property set...")
-            self.propSet=AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'propertySet')
-            self.logger.trace("processPropertySet: property set found.")
-        except ScriptingException, msg:
-            self.logger.trace("processPropertySet: msg=%s" % msg)
-            self.logger.trace("processPropertySet: property set not found.")
-        self.logger.trace("processPropertySet: propSet=%s " % self.propSet)
-        self.propList = AdminConfig.list(k, AdminConfig.getid(v['scope'])).split('\r\n')
-        for key in v.keys():
-            if key == 'name':
-                self.logger.trace("processPropertySet: key=%s, value=%s" % (key, v[key]))
-                itemFound="1"
-                for item in self.propList:
-                    self.logger.trace("processPropertySet: name=%s" % AdminConfig.showAttribute(item, 'name'))
-                    if AdminConfig.showAttribute(item, 'name') == v[key]:
-                        self.logger.trace("processPropertySet: actual name=%s, value=%s" % (AdminConfig.showAttribute(item, 'name'), AdminConfig.showAttribute(item, 'value')))
-                        self.logger.trace("processPropertySet: config name=%s, value=%s" % (v['name'], v['value']))
-                        if AdminConfig.showAttribute(item, 'value') != v['value']:
-                            if action == 'W':
-                                self.logger.info("processPropertySet: modifying %s:%s:%s=%s" % (AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'name'), AdminConfig.showAttribute(item, 'name'), 'value', v['value']))
-                                self.logger.debug("processPropertySet: command=AdminConfig.modify(%s, [[%s, %s]])" % (item, 'value', v['value']))
-                                AdminConfig.modify(item, [['value', v['value']]])
+            self.validateScope(v, 'processPropertySet')
+        except ProcessCommandException:
+            self.logger.info("processPropertySet: Skipping propertyset %s:%s " % (k, v))
+        else:
+            self.propSet = None
+            try:
+                self.logger.trace("processPropertySet: locating property set...")
+                self.propSet=AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'propertySet')
+                self.logger.trace("processPropertySet: property set found.")
+            except ScriptingException, msg:
+                self.logger.trace("processPropertySet: msg=%s" % msg)
+                self.logger.trace("processPropertySet: property set not found.")
+            self.logger.trace("processPropertySet: propSet=%s " % self.propSet)
+            self.propList = AdminConfig.list(k, AdminConfig.getid(v['scope'])).split('\r\n')
+            for key in v.keys():
+                if key == 'name':
+                    self.logger.trace("processPropertySet: key=%s, value=%s" % (key, v[key]))
+                    itemFound="1"
+                    for item in self.propList:
+                        self.logger.trace("processPropertySet: name=%s" % AdminConfig.showAttribute(item, 'name'))
+                        if AdminConfig.showAttribute(item, 'name') == v[key]:
+                            self.logger.trace("processPropertySet: actual name=%s, value=%s" % (AdminConfig.showAttribute(item, 'name'), AdminConfig.showAttribute(item, 'value')))
+                            self.logger.trace("processPropertySet: config name=%s, value=%s" % (v['name'], v['value']))
+                            if AdminConfig.showAttribute(item, 'value') != v['value']:
+                                if action == 'W':
+                                    self.logger.info("processPropertySet: modifying %s:%s:%s=%s" % (AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'name'), AdminConfig.showAttribute(item, 'name'), 'value', v['value']))
+                                    self.logger.debug("processPropertySet: command=AdminConfig.modify(%s, [[%s, %s]])" % (item, 'value', v['value']))
+                                    AdminConfig.modify(item, [['value', v['value']]])
+                                else:
+                                    self.logger.warn("processPropertySet: audit failure %s:%s, actual=%s config=%s" % (AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'name'), (AdminConfig.showAttribute(item, 'name')), AdminConfig.showAttribute(item, 'value'), v['value']))
+                                #end-if
                             else:
-                                self.logger.warn("processPropertySet: audit failure %s:%s, actual=%s config=%s" % (AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'name'), (AdminConfig.showAttribute(item, 'name')), AdminConfig.showAttribute(item, 'value'), v['value']))
+                                self.logger.debug("processPropertySet: ignoring %s %s" % (AdminConfig.showAttribute(item, 'name'), AdminConfig.showAttribute(item, 'value')))
                             #end-if
-                        else:
-                            self.logger.debug("processPropertySet: ignoring %s %s" % (AdminConfig.showAttribute(item, 'name'), AdminConfig.showAttribute(item, 'value')))
+                            itemFound = "0"
+                            break
                         #end-if
-                        itemFound = "0"
-                        break
+                    #end-for
+                    if itemFound == "1":
+                        if self.propSet != None:
+                            self.logger.info("processPropertySet: creating %s:%s:%s=%s" % (AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'name'), v[key], 'value', v['value']))
+                            self.logger.debug("processPropertySet: command=AdminConfig.create(%s, %s, [['name', '%s'],['type', '%s'],['value', '%s'],['required', '%s'])" % (k, self.propSet, v[key], v['type'], v['value'], v['required']))
+                            AdminConfig.create(k, self.propSet, [['name', v[key]],['type', v['type']],['value', v['value']],['required', v['required']]])
+                        else:
+                            self.logger.ERROR("processPropertySet: You tried to create a new property but the configuration does not have a property set.  You will need to to write some code to deal with this because I haven't done it yet :-)")
                     #end-if
-                #end-for
-                if itemFound == "1":
-                    if self.propSet != None:
-                        self.logger.info("processPropertySet: creating %s:%s:%s=%s" % (AdminConfig.showAttribute(AdminConfig.getid(v['scope']), 'name'), v[key], 'value', v['value']))
-                        self.logger.debug("processPropertySet: command=AdminConfig.create(%s, %s, [['name', '%s'],['type', '%s'],['value', '%s'],['required', '%s'])" % (k, self.propSet, v[key], v['type'], v['value'], v['required']))
-                        AdminConfig.create(k, self.propSet, [['name', v[key]],['type', v['type']],['value', v['value']],['required', v['required']]])
-                    else:
-                        self.logger.ERROR("processPropertySet: You tried to create a new property but the configuration does not have a property set.  You will need to to write some code to deal with this because I haven't done it yet :-)")
                 #end-if
-            #end-if
-        #end-for
+            #end-for
 
     def processSecurity(self, cmdDict=None, action=None):
         '''Used to process security properties'''
@@ -288,7 +300,7 @@ class ProcessCommands:
         v = cmdDict.values()[0]
         self.logger.trace("processSecrurity: key=%s, value=%s" % (k, v))
         if k and v != None:
-            self.validateScope(v, 'processPropertySet')
+            self.validateScope(v, 'processSecurity')
             self.jaasAuthDataList = AdminConfig.list(k, AdminConfig.getid('%sSecurity:/' % v['scope'])).split('\r\n')
             self.logger.trace("processSecrurity: jaasAuthDataList=%s"% self.jaasAuthDataList)
             for key in v.keys():
@@ -328,8 +340,11 @@ class ProcessCommands:
                         for key in v.keys():
                             if key != 'scope':
                                 attrList.append([key, v[key]])
-                        self.logger.debug("processSecrurity: command=AdminConfig.create(%s, %s, %s)" % (k, AdminConfig.getid('%sSecurity:/' % v['scope']), attrList))
-                        AdminConfig.create(k, AdminConfig.getid('%sSecurity:/' % v['scope']), attrList)
+                        if action == 'W':
+                            self.logger.debug("processSecrurity: command=AdminConfig.create(%s, %s, %s)" % (k, AdminConfig.getid('%sSecurity:/' % v['scope']), attrList))
+                            AdminConfig.create(k, AdminConfig.getid('%sSecurity:/' % v['scope']), attrList)
+                        else:
+                            self.logger.warn("processSecrurity: action is %s so this item will not be created %s:%s" % (action, k, v['alias']))
                     #end-if
                 #end-if
             #end-for
@@ -348,16 +363,20 @@ class ProcessCommands:
         v = cmdDict.values()[0]
         self.logger.trace("processAdminTask: key=%s, value=%s" % (k, v))
         if k and v != None:
-            self.validateScope(valueDict=v, method='processAdminTask')
-            attrDict = self.convertAttributesToAdminTaskStep(k=k, v=v)
-            if k == 'SIBus':
-                self.processSIB(k=k, a=attrDict, action=action)
-            elif k == 'SIBusMember':
-                self.processSIBusMember(k=k, a=attrDict, action=action)
-            elif k == 'SIBTopicSpace':
-                self.processSIBTopicSpace(k=k, a=attrDict, c=cmdDict, action=action)
-            elif k == 'SIBQueue':
-                self.processSIBQueue(k=k, a=attrDict, c=cmdDict, action=action)
+            try:
+                self.validateScope(valueDict=v, method='processAdminTask')
+            except ProcessCommandException:
+                self.logger.info("processAdminTask: Skipping AdminTask %s:%s " % (k, v))
+            else:
+                attrDict = self.convertAttributesToAdminTaskStep(k=k, v=v)
+                if k == 'SIBus':
+                    self.processSIB(k=k, a=attrDict, action=action)
+                elif k == 'SIBusMember':
+                    self.processSIBusMember(k=k, a=attrDict, action=action)
+                elif k == 'SIBTopicSpace':
+                    self.processSIBTopicSpace(k=k, a=attrDict, c=cmdDict, action=action)
+                elif k == 'SIBQueue':
+                    self.processSIBQueue(k=k, a=attrDict, c=cmdDict, action=action)
         else:
             self.logger.error("processPropertySet: key and value parameters were not suppled to the method.")
             raise ProcessCommandException("key and value parameters were not suppled to the method.")
@@ -455,9 +474,12 @@ class ProcessCommands:
                         else:
                             self.logger.warn("processSIB: audit failure %s:%s, actual=%s config=%s" % (k, AdminConfig.showAttribute(self.sib,'name'), AdminConfig.showAttribute(self.sib, key), attrDict[key]))
         else:
-            self.logger.info("processSIB: creating %s:%s" % (k, attrDict['bus']))
-            self.logger.debug("processSIB: command=AdminTask.createSIBus(%s)" % (["-%s %s" % (key, value) for key, value in attrDict.items()]))
-            AdminTask.createSIBus(["-%s %s" % (key, value) for key, value in attrDict.items()])
+            if action == 'W':
+                self.logger.info("processSIB: creating %s:%s" % (k, attrDict['bus']))
+                self.logger.debug("processSIB: command=AdminTask.createSIBus(%s)" % (["-%s %s" % (key, value) for key, value in attrDict.items()]))
+                AdminTask.createSIBus(["-%s %s" % (key, value) for key, value in attrDict.items()])
+            else:
+                self.logger.info("processSIB: action is %s, will not be creating %s:%s" % (action, k, attrDict['bus']))
 
     def processSIBusMember(self, k=None, a=None, action=None):
         attrDict=a
@@ -502,9 +524,12 @@ class ProcessCommands:
                         else:
                             self.logger.warn("processSIBTopicSpace: audit failure %s:%s: actualValue=%s, config=%s" % (AdminConfig.showAttribute(self.sib,'identifier'), key, actualValue, value))
         else:
-            self.logger.info("processSIBTopicSpace: creating %s:%s" % (k, attrDict['name']))
-            self.logger.debug("processSIBTopicSpace: command=AdminTask.createSIBDestination(%s)" % (["-%s %s" % (key, value) for key, value in attrDict.items()]))
-            AdminTask.createSIBDestination(["-%s %s" % (key, value) for key, value in attrDict.items()])
+            if action == 'W':
+                self.logger.info("processSIBTopicSpace: creating %s:%s" % (k, attrDict['name']))
+                self.logger.debug("processSIBTopicSpace: command=AdminTask.createSIBDestination(%s)" % (["-%s %s" % (key, value) for key, value in attrDict.items()]))
+                AdminTask.createSIBDestination(["-%s %s" % (key, value) for key, value in attrDict.items()])
+            else:
+                self.logger.info("processSIBTopicSpace: action is %s, will not be creating %s:%s" % (action, k, attrDict['name']))
 
     def processSIBQueue(self, k=None, a=None, c=None, action=None):
         attrDict=a
@@ -539,9 +564,12 @@ class ProcessCommands:
                         else:
                             self.logger.warn("processSIBQueue: audit failure %s:%s: actualValue=%s, config=%s" % (AdminConfig.showAttribute(self.sib,'identifier'), key, actualValue, value))
         else:
-            self.logger.info("processSIBQueue: creating %s:%s" % (k, attrDict['name']))
-            self.logger.debug("processSIBQueue: command=AdminTask.createSIBDestination(%s)" % (["-%s %s" % (key, value) for key, value in attrDict.items()]))
-            AdminTask.createSIBDestination(["-%s %s" % (key, value) for key, value in attrDict.items()])
+            if action == 'W':
+                self.logger.info("processSIBQueue: creating %s:%s" % (k, attrDict['name']))
+                self.logger.debug("processSIBQueue: command=AdminTask.createSIBDestination(%s)" % (["-%s %s" % (key, value) for key, value in attrDict.items()]))
+                AdminTask.createSIBDestination(["-%s %s" % (key, value) for key, value in attrDict.items()])
+            else:
+                self.logger.info("processSIBQueue: action is %s, will not be creating %s:%s" % (action, k, attrDict['name']))
 
 class ProcessCommandException(Exception):
     """ General exception method for class. """

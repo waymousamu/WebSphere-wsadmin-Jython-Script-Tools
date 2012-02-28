@@ -130,7 +130,7 @@ class TestProcessCommandsBASE(unittest.TestCase):
         else:
             self.assertEquals(0,1, "This should have thrown an exception.")
 
-    def testGenerateCommands(self):
+    def testGenerateCommandsWrite(self):
         '''This verifies that the configuration list contains valid dictionaries'''
         try:
             self.cg.generateCommands(cmdList=self.itemList, action='W')
@@ -139,14 +139,14 @@ class TestProcessCommandsBASE(unittest.TestCase):
         else:
             pass
 
-    def testGenerateCommandsException(self):
+    def testGenerateCommandsRead(self):
         '''This verifies that an exception is created when the generateCommand method is run in read only mode and objects do not yet exist'''
         try:
             self.cg.generateCommands(cmdList=self.itemList)
         except ProcessCommandException:
-            pass
-        else:
             self.assertEquals(0,1, "This should not have thrown an exception.")
+        else:
+            pass
 
 
     def testProcessConfigItemCreate(self):
@@ -413,37 +413,37 @@ class TestProcessCommandsBASE(unittest.TestCase):
     def testSIBQueueModify(self):
         self.cg.processAdminTask(cmdDict={'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description1'}}, action='W')
         self.cg.processAdminTask(cmdDict={'SIBusMember' : {'scope' : '/SIBus:DovetailSIBus/', 'server' : 'srv01', 'node' : 'node01'}}, action='W')
-        self.cg.processAdminTask(cmdDict={'SIBQueue': {'identifier': 'AsyncActionQueue', 'scope': '/SIBus:DovetailSIBus/', 'node': 'node01', 'server': 'srv01'}}, action='W')
-        self.cg.processAdminTask(cmdDict={'SIBQueue': {'identifier': 'AsyncActionQueue', 'scope': '/SIBus:DovetailSIBus/', 'node': 'node01', 'server': 'srv01'}}, action='W')
+        self.cg.processAdminTask(cmdDict={'SIBQueue': {'identifier': 'AsyncActionQueue', 'scope': '/SIBus:DovetailSIBus/', 'node': 'node01', 'server': 'srv01', 'description' : 'Queue1'}}, action='W')
+        self.cg.processAdminTask(cmdDict={'SIBQueue': {'identifier': 'AsyncActionQueue', 'scope': '/SIBus:DovetailSIBus/', 'node': 'node01', 'server': 'srv01', 'description' : 'Queue2'}}, action='W')
         destList = AdminTask.listSIBDestinations(['-bus DovetailSIBus']).split('\r\n')
         #print destList
         testattr = ''
         for dest in destList:
             #print AdminConfig.show(dest, 'identifier')
             if AdminConfig.showAttribute(dest, 'identifier') == 'AsyncActionQueue':
-                testattr = AdminConfig.showAttribute(dest, 'topicAccessCheckRequired')
+                testattr = AdminConfig.showAttribute(dest, 'description')
                 #print testattr
-                self.assertEqual(testattr, 'true')
+                self.assertEqual(testattr, 'Queue2')
 
     def testSIBQueueRead(self):
         self.cg.processAdminTask(cmdDict={'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description1'}}, action='W')
         self.cg.processAdminTask(cmdDict={'SIBusMember' : {'scope' : '/SIBus:DovetailSIBus/', 'server' : 'srv01', 'node' : 'node01'}}, action='W')
-        self.cg.processAdminTask(cmdDict={'SIBQueue': {'identifier': 'AsyncActionQueue', 'scope': '/SIBus:DovetailSIBus/', 'node': 'node01', 'server': 'srv01'}}, action='W')
-        self.cg.processAdminTask(cmdDict={'SIBQueue': {'identifier': 'AsyncActionQueue', 'scope': '/SIBus:DovetailSIBus/', 'node': 'node01', 'server': 'srv01'}})
+        self.cg.processAdminTask(cmdDict={'SIBQueue': {'identifier': 'AsyncActionQueue', 'scope': '/SIBus:DovetailSIBus/', 'node': 'node01', 'server': 'srv01', 'description' : 'Queue1'}}, action='W')
+        self.cg.processAdminTask(cmdDict={'SIBQueue': {'identifier': 'AsyncActionQueue', 'scope': '/SIBus:DovetailSIBus/', 'node': 'node01', 'server': 'srv01', 'description' : 'Queue2'}})
         destList = AdminTask.listSIBDestinations(['-bus DovetailSIBus']).split('\r\n')
         #print destList
         testattr = ''
         for dest in destList:
             #print AdminConfig.show(dest, 'identifier')
             if AdminConfig.showAttribute(dest, 'identifier') == 'AsyncActionQueue':
-                testattr = AdminConfig.showAttribute(dest, 'topicAccessCheckRequired')
+                testattr = AdminConfig.showAttribute(dest, 'description')
                 #print testattr
-                self.assertEqual(testattr, 'false')
+                self.assertEqual(testattr, 'Queue1')
 
 if __name__ == '__main__' or __name__ == 'main':
 
     #test suite that runs individual tests: use this for speed and enable only the tests you are develop[ing for.
-    suite = unittest.TestSuite()
+    #suite = unittest.TestSuite()
     #suite.addTest(TestProcessCommandsBASE('testJ2CActivationSpecCreate'))
     #suite.addTest(TestProcessCommandsBASE('testJ2CActivationSpecModify'))
     #suite.addTest(TestProcessCommandsBASE('testJ2CActivationSpecRead'))
@@ -451,14 +451,14 @@ if __name__ == '__main__' or __name__ == 'main':
 
     #suite.addTest(TestProcessCommandsBASE('testSIBModify'))
     #suite.addTest(TestProcessCommandsBASE('testSIBRead'))
-    suite.addTest(TestProcessCommandsBASE('testSIBQueueCreate'))
-    suite.addTest(TestProcessCommandsBASE('testSIBQueueModify'))
-    suite.addTest(TestProcessCommandsBASE('testSIBQueueRead'))
+    #suite.addTest(TestProcessCommandsBASE('testSIBQueueCreate'))
+    #suite.addTest(TestProcessCommandsBASE('testSIBQueueModify'))
+    #suite.addTest(TestProcessCommandsBASE('testSIBQueueRead'))
     #suite.addTest(TestProcessCommandsBASE('testEJBContainerModify'))
-    #suite.addTest(TestProcessCommandsBASE('testGenerateCommands'))
-    #suite.addTest(TestProcessCommandsBASE('testGenerateCommandsException'))
-    unittest.TextTestRunner(verbosity=2).run(suite)
+    #suite.addTest(TestProcessCommandsBASE('testGenerateCommandsWrite'))
+    #suite.addTest(TestProcessCommandsBASE('testGenerateCommandsRead'))
+    #unittest.TextTestRunner(verbosity=2).run(suite)
 
     #Test suite to run everything.  Use this to sanity check all tests.
-    #suite = unittest.TestLoader().loadTestsFromTestCase(TestProcessCommandsBASE)
-    #unittest.TextTestRunner(verbosity=2).run(suite)
+    suite = unittest.TestLoader().loadTestsFromTestCase(TestProcessCommandsBASE)
+    unittest.TextTestRunner(verbosity=2).run(suite)
