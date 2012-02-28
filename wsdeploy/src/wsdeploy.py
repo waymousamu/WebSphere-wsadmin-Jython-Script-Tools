@@ -62,11 +62,12 @@ class WsDeploy:
 if __name__ == '__main__' or __name__ == 'main':
     env = None
     action = None
+    print sys.argv
+    if len(sys.argv) == 1:
+        env = sys.argv[0]
     if len(sys.argv) == 2:
-        env = sys.argv[1]
-    if len(sys.argv) == 3:
-        env = sys.argv[1]
-        action = sys.argv[2]
+        env = sys.argv[0]
+        action = sys.argv[1]
     else:
         action = 'R'
     if env == None:

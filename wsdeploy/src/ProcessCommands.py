@@ -56,7 +56,7 @@ class ProcessCommands:
                 elif k == "JAASAuthData":
                     self.logger.trace("generateCommands: block = JAASAuthData")
                     self.processSecurity(cmdDict=cmdDict, action=self.action)
-                elif k == "ConnectionPool" or k == "connectionPool" or k == "sessionPool" or k == 'EJBCache':
+                elif k == "ConnectionPool" or k == "connectionPool" or k == "sessionPool" or k == 'EJBCache' or k == 'PMIService' or k == 'PMIRequestMetrics':
                     self.logger.trace("generateCommands: block = ConnectionPool, connectionPool, sessionPool")
                     self.processNestedAttribute(cmdDict=cmdDict, action=self.action)
                 elif k == "JavaVirtualMachine" or k == "ProcessExecution":
