@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="windows-1252"?>
+<!DOCTYPE page [
+	<!ENTITY envid "altus3400_Base">
+	<!ENTITY cellname "cell01">
+  	<!ENTITY node01name "node01">
+  	<!ENTITY node01hostname "altus3400.dovetail.net">
+	<!ENTITY node01soapport "8880">
+  	<!ENTITY server01name "srv01">
+	<!ENTITY runAsUser "websphere">
+	<!ENTITY runAsGroup "websphere">
+	<!ENTITY initialHeapSize "1024">
+	<!ENTITY maximumHeapSize "2048">
+	<!ENTITY genericJvmArguments "-DQ5INSTANCEID=1 -DQ5PINTRANSACTIONS=true -DSTPBULKSIZE=100 -DQ5CACHEFILTER=com.dovetailsys.shared.util.CacheFilter -DQ5CACHEOBJECTS=1024 -Dcom.dovetailsystems.q5.useLOBs=No -Dperform.bic.lookup=yes -Dperform.iban.validation=no -DQ5TRANSACTION_TIMEOUT=600 -DDEFAULT_GATEWAY_ROOT=/gateway -Dcom.ibm.CORBA.iiop.noLocalCopies=true -Xlp -Xgcpolicy:gencon -Xcompressedrefs -Xnoclassgc">
+	<!ENTITY jdbcProvider01name "XADPSJDBCProvider">
+	<!ENTITY jdbcProvider02name "DPSJDBCProvider">
+	<!ENTITY j2cAlias01 "dps_oracle_alias">
+	<!ENTITY j2cAlias01usr "swaymouth">
+	<!ENTITY j2cAlias01pwd "{xor}LDo8LTor">
+	<!ENTITY jndiDSPrefix "weblogic.jdbc.jts.">
+	<!ENTITY jdbcDSName01 "Q5DataSource">
+	<!ENTITY jdbcDSName02 "Q5DDLDataSource">
+	<!ENTITY jdbcDSName03 "Q5HistDataSource">
+	<!ENTITY jdbcDSName04 "Q5HistDDLDataSource">
+	<!ENTITY mqhostname "localhost">
+	<!ENTITY mqport "1414">
+	<!ENTITY mqqmname "QM1">
+	<!ENTITY mqchannel "CH1">
+	<!ENTITY sibname "DovetailSIBus">
+]>
+<env name="&envid;">
+	<Cell name="&cellname;">
+		<Security>
+			<JAASAuthData alias="&j2cAlias01;" userId="&j2cAlias01usr;"
+				password="&j2cAlias01pwd;" />
+		</Security>
+		<dmgr host="&node01hostname;" port="8880" />
+		<Node name="&node01name;">
+			<Server name="&server01name;">
+				<JavaProcessDef>
+					<ProcessExecution runAsUser="&runAsUser;" runAsGroup="&runAsGroup;" />
+					<JavaVirtualMachine initialHeapSize="&initialHeapSize;"
+						maximumHeapSize="&maximumHeapSize;" genericJvmArguments="&genericJvmArguments;" />
+				</JavaProcessDef>
+				<EJBContainer>
+					<EJBCache cacheSize="2000" cleanupInterval="0"/>
+				</EJBContainer>
+			</Server>
+		</Node>
+		<JDBCProvider name="&jdbcProvider01name;" description="XADPSJDBCProvider"
+			providerType="Oracle JDBC Driver (XA)" implementationClassName="oracle.jdbc.xa.client.OracleXADataSource"
+			xa="true" classpath="${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar">
+			<DataSource name="&jdbcDSName01;" jndiName="weblogic.jdbc.jts.Q5DataSource"
+				description="Q5DataSource" providerType="Oracle JDBC Driver (XA)"
+				authDataAlias="&node01name;/&j2cAlias01;"
+				xaRecoveryAuthAlias="&node01name;/&j2cAlias01;"
+				statementCacheSize="600"
+				datasourceHelperClassname="com.ibm.websphere.rsadapter.Oracle11gDataStoreHelper">
+				<J2EEResourcePropertySet>
+					<J2EEResourceProperty name="useRRASetEquals"
+						type="java.lang.String" value="true" required="false" />
+					<J2EEResourceProperty name="transactionBranchesLooselyCoupled"
+						type="java.lang.Boolean" value="true" required="false"/>
+					<J2EEResourceProperty name="validateNewConnection"
+						type="java.lang.Boolean" value="true" required="false"/>
+					<J2EEResourceProperty name="validateNewConnectionRetryCount"
+						type="java.lang.Integer" value="5" required="false"/>
+					<J2EEResourceProperty name="validateNewConnectionRetryInterval"
+						type="java.lang.Long" value="5" required="false"/>
+				</J2EEResourcePropertySet>
+				<ConnectionPool maxConnections="200" minConnections="10"
+					testConnection="true" testConnectionInterval="3" connectionTimeout="300" />
+			</DataSource>
+			<DataSource name="&jdbcDSName03;" jndiName="weblogic.jdbc.jts.Q5HistDataSource"
+				description="Q5DataSource" providerType="Oracle JDBC Driver (XA)"
+				authDataAlias="&node01name;/&j2cAlias01;"
+				xaRecoveryAuthAlias="&node01name;/&j2cAlias01;"
+				statementCacheSize="600"
+				datasourceHelperClassname="com.ibm.websphere.rsadapter.Oracle11gDataStoreHelper">
+				<J2EEResourcePropertySet>
+					<J2EEResourceProperty name="useRRASetEquals"
+						type="java.lang.String" value="true" required="false" />
+					<J2EEResourceProperty name="transactionBranchesLooselyCoupled"
+						type="java.lang.Boolean" value="true" required="false"/>
+					<J2EEResourceProperty name="validateNewConnection"
+						type="java.lang.Boolean" value="true" required="false"/>
+					<J2EEResourceProperty name="validateNewConnectionRetryCount"
+						type="java.lang.Integer" value="5" required="false"/>
+					<J2EEResourceProperty name="validateNewConnectionRetryInterval"
+						type="java.lang.Long" value="5" required="false"/>
+				</J2EEResourcePropertySet>
+				<ConnectionPool maxConnections="200" minConnections="10"
+					testConnection="true" testConnectionInterval="3" connectionTimeout="300" />
+			</DataSource>
+		</JDBCProvider>
+		<JDBCProvider name="&jdbcProvider02name;" description="DPSJDBCProvider"
+			providerType="Oracle JDBC Driver" implementationClassName="oracle.jdbc.pool.OracleConnectionPoolDataSource"
+			xa="false" classpath="${ORACLE_JDBC_DRIVER_PATH}/ojdbc6.jar">
+			<DataSource name="&jdbcDSName02;" jndiName="weblogic.jdbc.jts.Q5DDLDataSource"
+				description="Q5DataSource" providerType="Oracle JDBC Driver"
+				authDataAlias="&node01name;/&j2cAlias01;"
+				xaRecoveryAuthAlias="&node01name;/&j2cAlias01;"
+				statementCacheSize="10"
+				datasourceHelperClassname="com.ibm.websphere.rsadapter.Oracle11gDataStoreHelper">
+				<J2EEResourcePropertySet>
+					<J2EEResourceProperty name="useRRASetEquals"
+						type="java.lang.String" value="true" required="false" />
+					<J2EEResourceProperty name="transactionBranchesLooselyCoupled"
+						type="java.lang.Boolean" value="true" required="false"/>
+					<J2EEResourceProperty name="validateNewConnection"
+						type="java.lang.Boolean" value="true" required="false"/>
+					<J2EEResourceProperty name="validateNewConnectionRetryCount"
+						type="java.lang.Integer" value="5" required="false"/>
+					<J2EEResourceProperty name="validateNewConnectionRetryInterval"
+						type="java.lang.Long" value="5" required="false"/>
+				</J2EEResourcePropertySet>
+				<ConnectionPool maxConnections="200" minConnections="10"
+					testConnection="true" testConnectionInterval="3" connectionTimeout="300" />
+			</DataSource>
+			<DataSource name="&jdbcDSName04;" jndiName="weblogic.jdbc.jts.Q5HistDDLDataSource"
+				description="Q5DataSource" providerType="Oracle JDBC Driver"
+				authDataAlias="&node01name;/&j2cAlias01;"
+				xaRecoveryAuthAlias="&node01name;/&j2cAlias01;"
+				statementCacheSize="10"
+				datasourceHelperClassname="com.ibm.websphere.rsadapter.Oracle11gDataStoreHelper">
+				<J2EEResourcePropertySet>
+					<J2EEResourceProperty name="useRRASetEquals"
+						type="java.lang.String" value="true" required="false" />
+					<J2EEResourceProperty name="transactionBranchesLooselyCoupled"
+						type="java.lang.Boolean" value="true" required="false"/>
+					<J2EEResourceProperty name="validateNewConnection"
+						type="java.lang.Boolean" value="true" required="false"/>
+					<J2EEResourceProperty name="validateNewConnectionRetryCount"
+						type="java.lang.Integer" value="5" required="false"/>
+					<J2EEResourceProperty name="validateNewConnectionRetryInterval"
+						type="java.lang.Long" value="5" required="false"/>
+				</J2EEResourcePropertySet>
+				<ConnectionPool maxConnections="200" minConnections="10"
+					testConnection="true" testConnectionInterval="3" connectionTimeout="300" />
+			</DataSource>
+		</JDBCProvider>
+		<MQQueueConnectionFactory name="QCF1"
+			jndiName="jms/QCF1" queueManager="&mqqmname;" host="&mqhostname;" port="&mqport;"
+			channel="&mqchannel;" transportType="BINDINGS_THEN_CLIENT">
+			<J2EEResourcePropertySet>
+				<connectionPool maxConnections="200" />
+				<sessionPool minConnections="0" />
+			</J2EEResourcePropertySet>
+		</MQQueueConnectionFactory>
+		<MQQueue name="AccountingHVMessageSendQueue" jndiName="dovetail/jms/AccountingHVMessageSendQueue"
+			persistence="PERSISTENT" baseQueueName="AccountingHVMessageSendQueue"
+			baseQueueManagerName="&mqqmname;" queueManagerHost="&mqhostname;"
+			queueManagerPort="&mqport;" serverConnectionChannelName="&mqchannel;" />
+		<SIBus name="DovetailSIBus">
+			<SIBusMember server="&server01name;" node="&node01name;" />
+			<SIBTopicSpace identifier="CacheUpdateTopic" server="&server01name;" node="&node01name;"
+				topicAccessCheckRequired="false" />
+			<SIBQueue identifier="AsyncActionQueue" server="&server01name;" node="&node01name;"/>
+			<SIBQueue identifier="IntFilterReleasePaymentsQueue" server="&server01name;" node="&node01name;"/>
+			<SIBQueue identifier="EBACreditTransferSendQueue" server="&server01name;" node="&node01name;"/>
+			<SIBQueue identifier="EBADirectDebitSendQueue" server="&server01name;" node="&node01name;"/>
+			<SIBQueue identifier="EBADirectDebitB2BSendQueue" server="&server01name;" node="&node01name;"/>
+			<SIBQueue identifier="CustomerAndAccountReceiveQueue" server="&server01name;" node="&node01name;"/>
+			<SIBQueue identifier="OFCLVRequestMessageSendQueue" server="&server01name;" node="&node01name;"/>
+			<SIBQueue identifier="OFCLVResponseMessageReceiveQueue" server="&server01name;" node="&node01name;"/>
+			<SIBQueue identifier="OFCHVRequestMessageSendQueue" server="&server01name;" node="&node01name;"/>
+			<SIBQueue identifier="OFCHVResponseMessageReceiveQueue" server="&server01name;" node="&node01name;"/>
+			<SIBQueue identifier="GFCHVRequestMessageSendQueue" server="&server01name;" node="&node01name;"/>
+			<SIBQueue identifier="GFCHVResponseMessageReceiveQueue" server="&server01name;" node="&node01name;"/>
+			<SIBQueue identifier="GFCLVResponseMessageReceiveQueue" server="&server01name;" node="&node01name;"/>
+			<SIBQueue identifier="AccountingNotificationQueue" server="&server01name;" node="&node01name;"/>
+			<SIBQueue identifier="AdvisingNotificationQueue" server="&server01name;" node="&node01name;"/>
+			<SIBQueue identifier="DDAExternalLookupRequestQueue" server="&server01name;" node="&node01name;"/>
+			<SIBQueue identifier="DDAExternalLookupResponseQueue" server="&server01name;" node="&node01name;"/>
+			<SIBQueue identifier="AccountingLVMessageSendQueue" server="&server01name;" node="&node01name;"/>
+			<SIBQueue identifier="AccountingHVMessageSendQueue" server="&server01name;" node="&node01name;"/>
+		</SIBus>
+		<J2CActivationSpec jndiName="jms/CacheUpdateTopic" name="CacheUpdateTopic" destinationJndiName="dovetail/jms/CacheUpdateTopic">
+			<J2EEResourceProperty name="busName" type="java.lang.String" value="&sibname;"/>
+			<J2EEResourceProperty name="destinationType" type="java.lang.String" value="javax.jms.Topic" required="true"/>
+			<J2EEResourceProperty name="alwaysActivateAllMDBs" type="java.lang.Boolean" value="true" required="false"/>
+		</J2CActivationSpec>
+		<J2CActivationSpec jndiName="jms/AsyncActionQueue" name="AsyncActionMDBeanActivation" destinationJndiName="dovetail/jms/AsyncActionQueue">
+			<J2EEResourceProperty name="busName" type="java.lang.String" value="&sibname;"/>
+			<J2EEResourceProperty name="destinationType" type="java.lang.String" value="javax.jms.Queue" required="true"/>
+			<J2EEResourceProperty name="alwaysActivateAllMDBs" type="java.lang.Boolean" value="true" required="false"/>
+		</J2CActivationSpec>
+		<J2CActivationSpec jndiName="jms/IntFilterReleasePaymentsQueue" name="IntFilterMDBeanActivation" destinationJndiName="dovetail/jms/AsyncActionQueue">
+			<J2EEResourceProperty name="busName" type="java.lang.String" value="&sibname;"/>
+			<J2EEResourceProperty name="destinationType" type="java.lang.String" value="javax.jms.Queue" required="true"/>
+			<J2EEResourceProperty name="alwaysActivateAllMDBs" type="java.lang.Boolean" value="true" required="false"/>
+		</J2CActivationSpec>
+		<J2CActivationSpec jndiName="jms/ATRMatchPaymentsQueue" name="ATRMatchingMDBeanActivation" destinationJndiName="dovetail/jms/ATRMatchPaymentsQueue">
+			<J2EEResourceProperty name="busName" type="java.lang.String" value="&sibname;"/>
+			<J2EEResourceProperty name="destinationType" type="java.lang.String" value="javax.jms.Queue" required="true"/>
+			<J2EEResourceProperty name="alwaysActivateAllMDBs" type="java.lang.Boolean" value="true" required="false"/>
+		</J2CActivationSpec>
+		<J2CActivationSpec jndiName="jms/ReportGenerationMessageQueue" name="ReportGenerationMessageBeanActivation" destinationJndiName="dovetail/jms/ReportGenerationMessageQueue">
+			<J2EEResourceProperty name="busName" type="java.lang.String" value="&sibname;"/>
+			<J2EEResourceProperty name="destinationType" type="java.lang.String" value="javax.jms.Queue" required="true"/>
+			<J2EEResourceProperty name="alwaysActivateAllMDBs" type="java.lang.Boolean" value="true" required="false"/>
+		</J2CActivationSpec>
+		<J2CAdminObject jndiName="dovetail/jms/CacheUpdateTopic" name="CacheUpdateTopic">
+			<J2EEResourceProperty name="BusName" type="java.lang.String" value="&sibname;"/>
+			<J2EEResourceProperty name="TopicName" type="java.lang.String" value="CacheUpdateTopic"/>
+			<J2EEResourceProperty name="TopicSpace" type="java.lang.String" value="CacheUpdateTopic"/>
+		</J2CAdminObject>
+		<J2CConnectionFactory name="DovetailJMSXAQueueConnectionFactory" jndiName="dovetail/jms/XAQueueConnectionFactory" authDataAlias="evps-waymouthsNode/swaymouth" xaRecoveryAuthAlias="evps-waymouthsNode/swaymouth">
+			<J2EEResourceProperty name="BusName" type="java.lang.String" value="&sibname;"/>
+			<J2EEResourceProperty name="TargetType" type="java.lang.String" value="BusMember" required="false"/>
+			<J2EEResourceProperty name="TargetSignificance" type="java.lang.String" value="Preferred" required="false"/>
+			<J2EEResourceProperty name="ConnectionProximity" type="java.lang.String" value="Bus" required="false"/>
+			<J2EEResourceProperty name="ProviderEndpoints" type="java.lang.String" value="localhost:8102:BootstrapBasicMessaging" required="false"/>
+			<connectionPool maxConnections="100"/>
+		</J2CConnectionFactory>
+		<J2CConnectionFactory name="DovetailJMSQueueConnectionFactory" jndiName="dovetail/jms/QueueConnectionFactory" authDataAlias="evps-waymouthsNode/swaymouth">
+			<J2EEResourceProperty name="BusName" type="java.lang.String" value="&sibname;"/>
+			<J2EEResourceProperty name="TargetType" type="java.lang.String" value="BusMember" required="false"/>
+			<J2EEResourceProperty name="TargetSignificance" type="java.lang.String" value="Preferred" required="false"/>
+			<J2EEResourceProperty name="ConnectionProximity" type="java.lang.String" value="Bus" required="false"/>
+			<J2EEResourceProperty name="ProviderEndpoints" type="java.lang.String" value="localhost:8102:BootstrapBasicMessaging" required="false"/>
+			<connectionPool maxConnections="100"/>
+		</J2CConnectionFactory>>
+		<J2CConnectionFactory name="DovetailJMSXATopicConnectionFactory" jndiName="dovetail/jms/XATopicConnectionFactory" authDataAlias="evps-waymouthsNode/swaymouth" xaRecoveryAuthAlias="evps-waymouthsNode/swaymouth">
+			<J2EEResourceProperty name="BusName" type="java.lang.String" value="&sibname;"/>
+			<J2EEResourceProperty name="TargetType" type="java.lang.String" value="BusMember" required="false"/>
+			<J2EEResourceProperty name="TargetSignificance" type="java.lang.String" value="Preferred" required="false"/>
+			<J2EEResourceProperty name="ConnectionProximity" type="java.lang.String" value="Bus" required="false"/>
+			<J2EEResourceProperty name="ProviderEndpoints" type="java.lang.String" value="localhost:8102:BootstrapBasicMessaging" required="false"/>
+			<connectionPool maxConnections="100"/>
+		</J2CConnectionFactory>
+	</Cell>
+</env>
