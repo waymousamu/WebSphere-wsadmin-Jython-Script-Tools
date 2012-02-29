@@ -3,6 +3,7 @@ import sys
 import shutil
 from org.apache.log4j import Logger
 from java.lang.management import ManagementFactory
+from com.ibm.ws.scripting import ScriptingException
 import unittest
 
 sys.modules['AdminConfig'] = AdminConfig
@@ -440,6 +441,18 @@ class TestProcessCommandsBASE(unittest.TestCase):
                 #print testattr
                 self.assertEqual(testattr, 'Queue1')
 
+    def testSIBBusMemberNoCreate(self):
+        self.cg.processAdminTask(cmdDict={'SIBus' : {'name' : 'DovetailSIBus', 'scope' : '/Cell:cell01', 'description' : 'Description1'}}, action='W')
+
+        try:
+            self.cg.processAdminTask(cmdDict={'SIBusMember' : {'scope' : '/SIBus:DovetailSIBus/', 'server' : 'srv01', 'node' : 'node01'}}, action='W')
+            self.cg.processAdminTask(cmdDict={'SIBusMember' : {'scope' : '/SIBus:DovetailSIBus/', 'server' : 'srv01', 'node' : 'node01'}}, action='W')
+        except ScriptingException, msg:
+            print msg
+            self.assertEquals(0,1, "This should NOT have thrown an exception.")
+        else:
+            pass
+
 if __name__ == '__main__' or __name__ == 'main':
 
     #test suite that runs individual tests: use this for speed and enable only the tests you are develop[ing for.
@@ -455,7 +468,7 @@ if __name__ == '__main__' or __name__ == 'main':
     #suite.addTest(TestProcessCommandsBASE('testSIBQueueModify'))
     #suite.addTest(TestProcessCommandsBASE('testSIBQueueRead'))
     #suite.addTest(TestProcessCommandsBASE('testEJBContainerModify'))
-    suite.addTest(TestProcessCommandsBASE('testGenerateCommandsWrite'))
+    suite.addTest(TestProcessCommandsBASE('testSIBBusMemberNoCreate'))
     #suite.addTest(TestProcessCommandsBASE('testGenerateCommandsRead'))
     unittest.TextTestRunner(verbosity=2).run(suite)
 

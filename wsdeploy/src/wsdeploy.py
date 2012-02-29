@@ -58,8 +58,7 @@ class WsDeploy:
         self.conf = ProcessConfig()
         self.com = ProcessCommands()
         self.com.generateCommands(self.conf.readConfig(fh=self.xml), self.action)
-        if self.action == 'W':
-            AdminConfig.save()
+        print ("All done.")
 
 if __name__ == '__main__' or __name__ == 'main':
     env = None

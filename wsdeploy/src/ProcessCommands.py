@@ -73,6 +73,13 @@ class ProcessCommands:
                     '''Throw an exception if the tag is unknown'''
                     self.logger.error("generateCommands: %s is an unknown key.  Remove it from the configuration or add code to handle it." % k)
                     raise ProcessCommandException("generateCommands: %s is an unknown key. Remove it from the configuration or add code to handle it." % k)
+                #end-if
+                self.logger.debug("generateCommands: config save status is %s" % AdminConfig.hasChanges())
+                if AdminConfig.hasChanges() == 1:
+                    self.logger.info("generateCommands: saving changes.")
+                    AdminConfig.save()
+            #end-for
+        #end-for
 
     def processServer(self, cmdDict=None, action=None):
         '''processServer: This method processes a server configuration object. It takes two parameters, a dictionary containing the command and the action (RW)'''
@@ -372,7 +379,7 @@ class ProcessCommands:
                 if k == 'SIBus':
                     self.processSIB(k=k, a=attrDict, action=action)
                 elif k == 'SIBusMember':
-                    self.processSIBusMember(k=k, a=attrDict, action=action)
+                    self.processSIBusMember(k=k, a=attrDict, c=cmdDict.values()[0], action=action)
                 elif k == 'SIBTopicSpace':
                     self.processSIBTopicSpace(k=k, a=attrDict, c=cmdDict, action=action)
                 elif k == 'SIBQueue':
@@ -481,9 +488,13 @@ class ProcessCommands:
             else:
                 self.logger.info("processSIB: action is %s, will not be creating %s:%s" % (action, k, attrDict['bus']))
 
-    def processSIBusMember(self, k=None, a=None, action=None):
+    def processSIBusMember(self, k=None, a=None, c=None, action=None):
         attrDict=a
-        self.sib = AdminConfig.getid('/SIBusMember:%s/' % attrDict['server'])
+        self.logger.warn("processSIBusMember: attrDict %s" % attrDict)
+        cmdDict=c
+        self.logger.warn("processSIBusMember: cmdDict %s" % cmdDict)
+        self.sib = AdminConfig.getid('/SIBusMember:%s/' % cmdDict['server'])
+        self.logger.trace("processSIBusMember: self.sib=%s" % self.sib)
         if self.sib != '':
             self.logger.warn("processSIBusMember: server %s already member of the bus %s" % (attrDict['server'], attrDict['bus']))
         else:

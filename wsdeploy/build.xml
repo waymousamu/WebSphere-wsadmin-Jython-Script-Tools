@@ -2,5 +2,8 @@
 <project name="wsdeploy" default="init">
 	<target name="init">
 	</target>
+	<target name="createbuilddir">
+
+	</target>
 </project>
 
