@@ -1,4 +1,3 @@
-
 SET WSDEPLOY_HOME=C:/development/wsdeploy/wsdeploy
 SET WSDEPLOY_LIB=%WSDEPLOY_HOME%/lib
 SET WSDEPLOY_CONF=%WSDEPLOY_HOME%/conf
