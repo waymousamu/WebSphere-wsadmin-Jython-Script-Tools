@@ -1,9 +1,36 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project name="wsdeploy" default="init">
-	<target name="init">
+	<target name="init" depends="createDistribution">
+		<echo message="Created wsdeploy distribution in ../wsdeploy.zip"/>
 	</target>
-	<target name="createbuilddir">
-
+	<target name="clean">
+		<delete dir="../build"/>
+	</target>
+	<target name="createBuildDir" depends="clean">
+		<mkdir dir="../build"/>
+	</target>
+	<target name="copyFiles" depends="createBuildDir">
+		<copy todir="../build">
+			<fileset file="wsdeploy.bat"/>
+			<fileset file="wsdeploy.sh"/>
+		</copy>
+		<copy todir="../build/conf">
+	    	<fileset dir="conf" includes="sample.xml,log4j.properties"/>
+		</copy>
+		<copy todir="../build/src">
+			<fileset dir="src" includes="Install.py,ProcessCommands.py,ProcessConfig.py,wsdeploy.py"/>
+		</copy>
+		<copy todir="../build/lib">
+			<fileset dir="lib" includes="log4j-1.2.15.jar"/>
+		</copy>
+		<mkdir dir="../build/tmp"/>
+		<mkdir dir="../build/log"/>
+	</target>
+	<target name="modifyFiles" depends="copyFiles">
+		<fixcrlf file="../build/wsdeploy.sh" eol="unix" />
+	</target>
+	<target name="createDistribution" depends="modifyFiles">
+		<zip destfile="../build/wsdeploy.zip" basedir="../build"/>
+		<move file="../build/wsdeploy.zip" todir="../"/>
 	</target>
 </project>
-
