@@ -456,7 +456,7 @@ class TestProcessCommandsBASE(unittest.TestCase):
 if __name__ == '__main__' or __name__ == 'main':
 
     #test suite that runs individual tests: use this for speed and enable only the tests you are develop[ing for.
-    suite = unittest.TestSuite()
+    #suite = unittest.TestSuite()
     #suite.addTest(TestProcessCommandsBASE('testJ2CActivationSpecCreate'))
     #suite.addTest(TestProcessCommandsBASE('testJ2CActivationSpecModify'))
     #suite.addTest(TestProcessCommandsBASE('testJ2CActivationSpecRead'))
@@ -468,10 +468,11 @@ if __name__ == '__main__' or __name__ == 'main':
     #suite.addTest(TestProcessCommandsBASE('testSIBQueueModify'))
     #suite.addTest(TestProcessCommandsBASE('testSIBQueueRead'))
     #suite.addTest(TestProcessCommandsBASE('testEJBContainerModify'))
-    suite.addTest(TestProcessCommandsBASE('testSIBBusMemberNoCreate'))
+    #suite.addTest(TestProcessCommandsBASE('testProcessPropertySetCreate'))
+    #suite.addTest(TestProcessCommandsBASE('testProcessPropertySetModify'))
     #suite.addTest(TestProcessCommandsBASE('testGenerateCommandsRead'))
-    unittest.TextTestRunner(verbosity=2).run(suite)
+    #unittest.TextTestRunner(verbosity=2).run(suite)
 
     #Test suite to run everything.  Use this to sanity check all tests.
-    #suite = unittest.TestLoader().loadTestsFromTestCase(TestProcessCommandsBASE)
-    #unittest.TextTestRunner(verbosity=2).run(suite)
+    suite = unittest.TestLoader().loadTestsFromTestCase(TestProcessCommandsBASE)
+    unittest.TextTestRunner(verbosity=2).run(suite)

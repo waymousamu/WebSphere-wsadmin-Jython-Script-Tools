@@ -260,7 +260,8 @@ class ProcessCommands:
                 self.logger.trace("processPropertySet: msg=%s" % msg)
                 self.logger.trace("processPropertySet: property set not found.")
             self.logger.trace("processPropertySet: propSet=%s " % self.propSet)
-            self.propList = AdminConfig.list(k, AdminConfig.getid(v['scope'])).split('\r\n')
+            self.propList = AdminConfig.list(k, AdminConfig.getid(v['scope'])).splitlines()
+            self.logger.trace("processPropertySet: self.propList=%s " % self.propList)
             for key in v.keys():
                 if key == 'name':
                     self.logger.trace("processPropertySet: key=%s, value=%s" % (key, v[key]))
@@ -308,7 +309,7 @@ class ProcessCommands:
         self.logger.trace("processSecrurity: key=%s, value=%s" % (k, v))
         if k and v != None:
             self.validateScope(v, 'processSecurity')
-            self.jaasAuthDataList = AdminConfig.list(k, AdminConfig.getid('%sSecurity:/' % v['scope'])).split('\r\n')
+            self.jaasAuthDataList = AdminConfig.list(k, AdminConfig.getid('%sSecurity:/' % v['scope'])).splitlines()
             self.logger.trace("processSecrurity: jaasAuthDataList=%s"% self.jaasAuthDataList)
             for key in v.keys():
                 if key == 'alias':
@@ -490,12 +491,23 @@ class ProcessCommands:
 
     def processSIBusMember(self, k=None, a=None, c=None, action=None):
         attrDict=a
-        self.logger.warn("processSIBusMember: attrDict %s" % attrDict)
+        self.logger.trace("processSIBusMember: attrDict %s" % attrDict)
         cmdDict=c
-        self.logger.warn("processSIBusMember: cmdDict %s" % cmdDict)
-        self.sib = AdminConfig.getid('/SIBusMember:%s/' % cmdDict['server'])
+        self.logger.trace("processSIBusMember: cmdDict %s" % cmdDict)
+        sibmembers = AdminConfig.list(k, AdminConfig.getid(cmdDict['scope'])).splitlines()
+        self.logger.trace("processSIBusMember: sibmembers=%s" % sibmembers)
+        self.logger.trace("processSIBusMember: sibmembers[0]=%s" % sibmembers[0])
+        self.sib = None
+        if sibmembers[0] != '':
+            self.logger.trace("processSIBusMember: found members in the bus.")
+            for sibmember in sibmembers:
+                self.logger.trace("processSIBusMember: sibmember=%s" % sibmember)
+                membername = AdminConfig.showAttribute(sibmember, 'server')
+                self.logger.trace("processSIBusMember: membername=%s" % membername)
+                if membername == attrDict['server']:
+                    self.sib = sibmember
         self.logger.trace("processSIBusMember: self.sib=%s" % self.sib)
-        if self.sib != '':
+        if self.sib != None:
             self.logger.warn("processSIBusMember: server %s already member of the bus %s" % (attrDict['server'], attrDict['bus']))
         else:
             self.logger.info("processSIBusMember: creating %s:%s" % (k, attrDict['bus']))
@@ -509,7 +521,7 @@ class ProcessCommands:
         cmdDict=c['SIBTopicSpace']
         self.logger.trace("processSIBTopicSpace: cmdDict=%s" % cmdDict)
         self.sib = None
-        queueList = AdminTask.listSIBDestinations(['-bus %s' % attrDict['bus']]).split('\r\n')
+        queueList = AdminTask.listSIBDestinations(['-bus %s' % attrDict['bus']]).splitlines()
         self.logger.trace("processSIBTopicSpace: queueList=%s" % queueList)
         for queue in queueList:
             self.logger.trace("processSIBTopicSpace: queue=%s" % queue)
@@ -521,7 +533,7 @@ class ProcessCommands:
         self.logger.trace("processSIBTopicSpace: self.sib=%s" % self.sib)
         if self.sib != None:
             self.logger.warn("processSIBTopicSpace: topic %s already exists on bus %s" % (attrDict['name'], attrDict['bus']))
-            self.logger.trace("processSIBTopicSpace: topic attributes:%s" % AdminConfig.show(self.sib).split('\r\n'))
+            self.logger.trace("processSIBTopicSpace: topic attributes:%s" % AdminConfig.show(self.sib).splitlines())
             for key, value in cmdDict.items():
                 self.logger.trace("processSIBTopicSpace: key=%s, value=%s" % (key, value))
                 if key != 'scope' and key != 'node' and key != 'server' and key != 'identifier':
@@ -549,7 +561,7 @@ class ProcessCommands:
         cmdDict=c['SIBQueue']
         self.logger.trace("processSIBQueue: cmdDict=%s" % cmdDict)
         self.sib = None
-        queueList = AdminTask.listSIBDestinations(['-bus %s' % attrDict['bus']]).split('\r\n')
+        queueList = AdminTask.listSIBDestinations(['-bus %s' % attrDict['bus']]).splitlines()
         self.logger.trace("processSIBQueue: queueList=%s" % queueList)
         for queue in queueList:
             self.logger.trace("processSIBQueue: queue=%s" % queue)
@@ -561,7 +573,7 @@ class ProcessCommands:
         self.logger.trace("processSIBQueue: self.sib=%s" % self.sib)
         if self.sib != None:
             self.logger.warn("processSIBQueue: queue %s already exists on bus %s" % (attrDict['name'], attrDict['bus']))
-            self.logger.trace("processSIBQueue: queue attributes:%s" % AdminConfig.show(self.sib).split('\r\n'))
+            self.logger.trace("processSIBQueue: queue attributes:%s" % AdminConfig.show(self.sib).splitlines())
             for key, value in cmdDict.items():
                 self.logger.trace("processSIBQueue: key=%s, value=%s" % (key, value))
                 if key != 'scope' and key != 'node' and key != 'server' and key != 'identifier':
