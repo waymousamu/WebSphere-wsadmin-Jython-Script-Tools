@@ -43,11 +43,11 @@ props['libPath'] = libPath
 props['jythonpath'] = jythonpath
 props['srcPath'] = srcPath
 props['testPath'] = testPath
-#print props
+print props
 
 '''import the wsdeploy modules'''
 from ProcessConfig import *
-from CommandGenerator import *
+#from CommandGenerator import *
 from ProcessCommands import *
 from Install import *
 
@@ -138,5 +138,5 @@ class TestProcessConfigBASE(unittest.TestCase):
 if __name__ == '__main__' or __name__ == 'main':
     suite = unittest.TestLoader().loadTestsFromTestCase(TestProcessConfigBASE)
     unittest.TextTestRunner(verbosity=2).run(suite)
-    suite = unittest.TestLoader().loadTestsFromTestCase(TestProcessConfigND)
-    unittest.TextTestRunner(verbosity=2).run(suite)
+    #suite = unittest.TestLoader().loadTestsFromTestCase(TestProcessConfigND)
+    #unittest.TextTestRunner(verbosity=2).run(suite)

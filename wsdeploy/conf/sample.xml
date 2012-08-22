@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="windows-1252"?>
 <!DOCTYPE page [
 	<!ENTITY envid "altus3400_Base">
-	<!ENTITY cellname "cell01">
+	<!ENTITY cellname "SYMECell01">
   	<!ENTITY node01name "node01">
   	<!ENTITY node01hostname "altus3400.dovetail.net">
 	<!ENTITY node01soapport "8880">
@@ -35,6 +35,10 @@
 				password="&j2cAlias01pwd;" />
 		</Security>
 		<dmgr host="&node01hostname;" port="8880" />
+		<VirtualHost name="VH_test">
+			<HostAlias hostname="*" port="9020"/>
+            <HostAlias hostname="*" port="9120"/>
+        </VirtualHost>
 		<Node name="&node01name;">
 			<Server name="&server01name;">
 				<JavaProcessDef>

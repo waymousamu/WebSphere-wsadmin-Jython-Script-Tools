@@ -61,10 +61,10 @@ class TestProcessCommandsBASE(unittest.TestCase):
     def setUp(self):
         self.cg = ProcessCommands()
         self.itemList = CONFDICT_BASE
-        self.srv = AdminConfig.getid('/Server:srv01/')
-        self.pe = AdminConfig.list('ProcessExecution', self.srv)
-        AdminConfig.modify(self.pe, [['runAsUser', 'websphere']])
-        AdminConfig.modify(self.pe, [['runAsGroup', 'websphere']])
+        #self.srv = AdminConfig.getid('/Server:srv01/')
+        #self.pe = AdminConfig.list('ProcessExecution', self.srv)
+        #AdminConfig.modify(self.pe, [['runAsUser', 'websphere']])
+        #AdminConfig.modify(self.pe, [['runAsGroup', 'websphere']])
 
     def tearDown(self):
         self.cg = None
@@ -97,6 +97,10 @@ class TestProcessCommandsBASE(unittest.TestCase):
         self.j2cas = AdminConfig.getid('/J2CActivationSpec:CacheUpdateTopic/')
         if self.j2cas != '':
             AdminConfig.remove(self.j2cas)
+        if AdminConfig.getid('/VirtualHost:VH_test1/') != '':
+            AdminConfig.remove(AdminConfig.getid('/VirtualHost:VH_test1/'))
+        if AdminConfig.getid('/VirtualHost:VH_test/') != '':
+            AdminConfig.remove(AdminConfig.getid('/VirtualHost:VH_test/'))
 
     def testNoCommandsException(self):
         cmdList = None
@@ -452,11 +456,17 @@ class TestProcessCommandsBASE(unittest.TestCase):
             self.assertEquals(0,1, "This should NOT have thrown an exception.")
         else:
             pass
-
+    
+    def testVirtualHostCreate(self):
+        self.cg.processConfigItem(cmdDict={'VirtualHost': {'name': 'VH_test', 'scope': '/Cell:SYMECell01/'}}, action='W')
+        self.vh = AdminConfig.getid('/VirtualHost:VH_test/')
+        self.vhname=AdminConfig.showAttribute(self.vh, 'name')
+        self.assertEqual(self.vhname, 'VH_test')
+    
 if __name__ == '__main__' or __name__ == 'main':
 
     #test suite that runs individual tests: use this for speed and enable only the tests you are develop[ing for.
-    #suite = unittest.TestSuite()
+    suite = unittest.TestSuite()
     #suite.addTest(TestProcessCommandsBASE('testJ2CActivationSpecCreate'))
     #suite.addTest(TestProcessCommandsBASE('testJ2CActivationSpecModify'))
     #suite.addTest(TestProcessCommandsBASE('testJ2CActivationSpecRead'))
@@ -471,8 +481,9 @@ if __name__ == '__main__' or __name__ == 'main':
     #suite.addTest(TestProcessCommandsBASE('testProcessPropertySetCreate'))
     #suite.addTest(TestProcessCommandsBASE('testProcessPropertySetModify'))
     #suite.addTest(TestProcessCommandsBASE('testGenerateCommandsRead'))
-    #unittest.TextTestRunner(verbosity=2).run(suite)
+    suite.addTest(TestProcessCommandsBASE('testVirtualHostCreate'))
+    unittest.TextTestRunner(verbosity=2).run(suite)
 
     #Test suite to run everything.  Use this to sanity check all tests.
-    suite = unittest.TestLoader().loadTestsFromTestCase(TestProcessCommandsBASE)
-    unittest.TextTestRunner(verbosity=2).run(suite)
+    #suite = unittest.TestLoader().loadTestsFromTestCase(TestProcessCommandsBASE)
+    #unittest.TextTestRunner(verbosity=2).run(suite)

@@ -14,6 +14,7 @@ from com.ibm.ws.scripting import ScriptingException
 class ProcessCommands:
 
     logger = Logger.getLogger("ProcessCommands")
+    PropertyConfigurator.configure("conf/log4j.properties")
 
     def generateCommands(self, cmdList=None, action=None):
         '''Method that takes a list of command dictionaries and processes them.  Use this method to process a series or sequential commands.'''
